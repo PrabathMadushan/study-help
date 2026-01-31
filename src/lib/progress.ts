@@ -6,6 +6,30 @@ export type NoteProgress = {
   status: ProgressStatus
   lastViewedAt?: string
   completedAt?: string
+  nextReviewAt?: string
+  lastReviewedAt?: string
+  reviewCount?: number
+}
+
+const REVIEW_INTERVAL_DAYS = [3, 7, 7] // first review +3d, second +7d, then +7d
+
+function addDays(date: Date, days: number): string {
+  const d = new Date(date)
+  d.setDate(d.getDate() + days)
+  return d.toISOString()
+}
+
+function isDue(p: NoteProgress): boolean {
+  if (p.status !== 'completed') return false
+  const now = Date.now()
+  if (p.nextReviewAt) {
+    return new Date(p.nextReviewAt).getTime() <= now
+  }
+  if (p.completedAt) {
+    const completedMs = new Date(p.completedAt).getTime()
+    return completedMs + 24 * 60 * 60 * 1000 <= now
+  }
+  return false
 }
 
 export type ProgressStore = Record<string, NoteProgress>
@@ -52,6 +76,7 @@ export function setProgress(noteId: string, update: Partial<NoteProgress>): void
   }
   if (update.status === 'completed' && !next.completedAt) {
     next.completedAt = new Date().toISOString()
+    next.nextReviewAt = addDays(new Date(), 1)
   }
   if (update.lastViewedAt === undefined && (update.status === 'in_progress' || update.status === 'completed')) {
     next.lastViewedAt = new Date().toISOString()
@@ -71,6 +96,36 @@ export function markViewed(noteId: string): void {
 
 export function markCompleted(noteId: string): void {
   setProgress(noteId, { status: 'completed' })
+}
+
+/**
+ * Returns note IDs that are completed and due for review (nextReviewAt <= now, or no nextReviewAt and completedAt + 1 day <= now).
+ */
+export function getNotesDueForReview(noteIds: string[], store: ProgressStore): string[] {
+  return noteIds.filter((id) => {
+    const p = store[id]
+    return p != null && isDue(p)
+  })
+}
+
+/**
+ * Record that a note was reviewed. Advances fixed-interval ladder: first review +3d, second +7d, then +7d.
+ */
+export function recordReview(noteId: string): void {
+  const store = load()
+  const current = store[noteId]
+  if (!current || current.status !== 'completed') return
+  const count = current.reviewCount ?? 0
+  const intervalIndex = Math.min(count, REVIEW_INTERVAL_DAYS.length - 1)
+  const days = REVIEW_INTERVAL_DAYS[intervalIndex]
+  const next: NoteProgress = {
+    ...current,
+    nextReviewAt: addDays(new Date(), days),
+    lastReviewedAt: new Date().toISOString(),
+    reviewCount: count + 1,
+  }
+  const newStore = { ...store, [noteId]: next }
+  save(newStore)
 }
 
 export function markNotStarted(noteId: string): void {
