@@ -4,9 +4,8 @@ import { useAuth } from '../contexts/AuthContext'
 import { ProgressBar } from './ProgressBar'
 
 export function Layout() {
-  const { getOverallProgress, getDueCount } = useProgress()
+  const { getOverallProgress } = useProgress()
   const overallProgress = getOverallProgress()
-  const dueCount = getDueCount()
   const { user, loading, signOut } = useAuth()
   const navigate = useNavigate()
 
@@ -25,14 +24,9 @@ export function Layout() {
             </Link>
             <Link
               to="/review"
-              className="flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400"
+              className="text-sm text-gray-600 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400"
             >
               Review
-              {dueCount > 0 && (
-                <span className="rounded-full bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 px-2 py-0.5 text-xs font-medium">
-                  {dueCount}
-                </span>
-              )}
             </Link>
           </div>
           <div className="flex items-center gap-3 min-w-0 flex-1 justify-end">

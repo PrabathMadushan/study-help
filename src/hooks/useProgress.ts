@@ -2,12 +2,10 @@ import { useCallback, useSyncExternalStore } from 'react'
 import {
   load,
   markViewed,
-  markCompleted,
   markNotStarted,
   computeProgressPercent,
   computeOverallProgressPercent,
-  getNotesDueForReview as getNotesDueForReviewLocal,
-  recordReview as recordReviewLocal,
+  setNoteScore as setNoteScoreLocal,
   type NoteProgress,
   type ProgressStore,
 } from '../lib/progress'
@@ -15,16 +13,13 @@ import {
   subscribe as firestoreSubscribe,
   getSnapshot as firestoreGetSnapshot,
   markViewed as firestoreMarkViewed,
-  markCompleted as firestoreMarkCompleted,
   markNotStarted as firestoreMarkNotStarted,
   computeProgressPercent as firestoreComputeProgressPercent,
   computeOverallProgressPercent as firestoreComputeOverallProgressPercent,
-  getNotesDueForReview as getNotesDueForReviewFirestore,
-  recordReview as recordReviewFirestore,
+  setNoteScore as setNoteScoreFirestore,
 } from '../lib/progressFirestore'
 import { useAuth } from '../contexts/AuthContext'
 import { notes } from '../data/notes'
-import { getNoteIdsWithFlashcards } from '../data/flashcards'
 
 function getLocalSnapshot(): ProgressStore {
   return load()
@@ -39,7 +34,7 @@ function subscribeLocal(callback: () => void): () => void {
 
 const progressListeners = new Set<() => void>()
 
-function notifyProgress(): void {
+export function notifyProgress(): void {
   progressListeners.forEach((cb) => cb())
 }
 
@@ -73,12 +68,12 @@ export function useProgress() {
     [user]
   )
 
-  const setNoteCompleted = useCallback(
-    (noteId: string) => {
+  const setNoteScore = useCallback(
+    (noteId: string, score: number) => {
       if (user) {
-        firestoreMarkCompleted(user.uid, noteId)
+        setNoteScoreFirestore(user.uid, noteId, score)
       } else {
-        markCompleted(noteId)
+        setNoteScoreLocal(noteId, score)
         notifyProgress()
       }
     },
@@ -99,7 +94,7 @@ export function useProgress() {
 
   const getNoteProgress = useCallback(
     (noteId: string): NoteProgress => {
-      return store[noteId] ?? { status: 'not_started' }
+      return store[noteId] ?? {}
     },
     [store]
   )
@@ -126,6 +121,23 @@ export function useProgress() {
     [store, user]
   )
 
+  const getSubSubcategoryProgress = useCallback(
+    (categoryId: string, subcategoryId: string, subSubcategoryId: string): number => {
+      const noteIds = notes
+        .filter(
+          (n) =>
+            n.categoryId === categoryId &&
+            n.subcategoryId === subcategoryId &&
+            n.subSubcategoryId === subSubcategoryId
+        )
+        .map((n) => n.id)
+      return user
+        ? firestoreComputeProgressPercent(noteIds, store)
+        : computeProgressPercent(noteIds)
+    },
+    [store, user]
+  )
+
   const getOverallProgress = useCallback((): number => {
     const allIds = notes.map((n) => n.id)
     return user
@@ -133,41 +145,14 @@ export function useProgress() {
       : computeOverallProgressPercent(allIds)
   }, [store, user])
 
-  const getNotesDueForReview = useCallback(
-    (noteIds: string[]): string[] => {
-      return user
-        ? getNotesDueForReviewFirestore(noteIds, store)
-        : getNotesDueForReviewLocal(noteIds, store)
-    },
-    [store, user]
-  )
-
-  const getDueCount = useCallback((): number => {
-    const idsWithFlashcards = getNoteIdsWithFlashcards()
-    return getNotesDueForReview(idsWithFlashcards).length
-  }, [getNotesDueForReview])
-
-  const recordReview = useCallback(
-    (noteId: string) => {
-      if (user) {
-        recordReviewFirestore(user.uid, noteId)
-      } else {
-        recordReviewLocal(noteId)
-      }
-    },
-    [user]
-  )
-
   return {
     getNoteProgress,
     setNoteViewed,
-    setNoteCompleted,
+    setNoteScore,
     setNoteNotStarted,
     getCategoryProgress,
     getSubcategoryProgress,
+    getSubSubcategoryProgress,
     getOverallProgress,
-    getNotesDueForReview,
-    getDueCount,
-    recordReview,
   }
 }

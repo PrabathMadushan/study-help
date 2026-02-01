@@ -8,16 +8,46 @@ export type FlashcardData = {
  * Empty interviewAnswer = excluded from "Practice all" deck.
  */
 export const flashcardData: Record<string, FlashcardData> = {
-  'react-hooks-basics': { interviewAnswer: '' },
-  'react-usememo-usecallback-useref': { interviewAnswer: '' },
-  'react-custom-hooks': { interviewAnswer: '' },
-  'react-performance': { interviewAnswer: '' },
-  'react-reconciliation-keys': { interviewAnswer: '' },
-  'react-error-boundaries': { interviewAnswer: '' },
-  'react-context-vs-redux': { interviewAnswer: '' },
-  'react-compound-components': { interviewAnswer: '' },
-  'react-data-fetching': { interviewAnswer: '' },
-  'react-typescript': { interviewAnswer: '' },
+  'react-hooks-basics': {
+    interviewAnswer:
+      'useState holds local state and triggers re-renders on update. useEffect runs after render: I use it for subscriptions, fetch, or DOM side effects. I pass a dependency array so it only runs when those values change; empty array runs once on mount. I avoid stale closures by listing dependencies correctly.',
+  },
+  'react-usememo-usecallback-useref': {
+    interviewAnswer:
+      'useMemo memoizes a computed value so we don\'t recalculate every render; useCallback memoizes a function so child components receiving it don\'t re-render unnecessarily. useRef gives a mutable ref object that persists across renders without causing re-renders — I use it for DOM refs, previous value, or timers.',
+  },
+  'react-custom-hooks': {
+    interviewAnswer:
+      'Custom hooks are functions that use other hooks. I extract shared logic (e.g. form state, API fetch, subscription) into a hook so it\'s reusable and testable. Rules: only call hooks at the top level and from React code. I name them with use- so the linter enforces the rules.',
+  },
+  'react-performance': {
+    interviewAnswer:
+      'I use React.memo for pure components to skip re-renders when props are referentially equal. useMemo and useCallback avoid unnecessary recalculations and stable callbacks. For large lists I use virtualization (e.g. react-window). Code splitting with lazy and Suspense loads chunks on demand. I profile with React DevTools to find real bottlenecks.',
+  },
+  'react-reconciliation-keys': {
+    interviewAnswer:
+      'Reconciliation is React\'s diff of the virtual DOM to update the real DOM. Keys help React match list items across renders so it can reuse and reorder instead of recreating. I use a stable unique id from data, never array index when the list can reorder or change — wrong keys cause bugs and wasted updates.',
+  },
+  'react-error-boundaries': {
+    interviewAnswer:
+      'Error boundaries are class components that catch JS errors in their tree and show a fallback UI instead of crashing. I use componentDidCatch and getDerivedStateFromError. They don\'t catch errors in event handlers, async code, or SSR — I handle those with try/catch. I place them at segment boundaries to isolate failures.',
+  },
+  'react-context-vs-redux': {
+    interviewAnswer:
+      'Context is built-in: I use it for theme, auth, or locale that many components need. Redux gives a single store, predictable updates with reducers, and DevTools. I pick Context when the tree is small and updates are infrequent; Redux when I need time-travel, middleware, or complex shared state. I often combine both.',
+  },
+  'react-compound-components': {
+    interviewAnswer:
+      'Compound components are a set of components that work together and share implicit state (e.g. Tabs and TabPanel). I implement them with React Context: a parent provides state and callbacks, children consume via useContext. The API is flexible — users compose the markup — and I keep the state logic in one place.',
+  },
+  'react-data-fetching': {
+    interviewAnswer:
+      'I fetch in useEffect with a cleanup to avoid setting state after unmount. I track loading and error state and show appropriate UI. For server state I use a library like React Query or SWR for caching, deduping, and revalidation. For forms I use controlled components and validate on submit or on blur depending on UX.',
+  },
+  'react-typescript': {
+    interviewAnswer:
+      'I type props with an interface, use React.FC sparingly and prefer explicit return types. I type useState and useRef generically. For event handlers I use React.ChangeEvent<HTMLInputElement> and similar. I avoid any; for refs to DOM elements I use useRef<HTMLDivElement>(null). I type children when needed with React.ReactNode.',
+  },
   'js-closures': {
     interviewAnswer:
       'A closure is when an inner function keeps access to its outer scope after the outer function has returned. The inner function closes over the outer scope\'s variables. I use closures for private state (module pattern), callbacks that need to remember a value, and factories. In React, hooks like useState rely on closure to capture the latest state in callbacks.',
@@ -96,4 +126,19 @@ export function getNoteIdsWithFlashcards(): string[] {
   return Object.entries(flashcardData)
     .filter(([, data]) => data.interviewAnswer.trim() !== '')
     .map(([id]) => id)
+}
+
+/** Filter note IDs to only those that have flashcard content (non-empty interviewAnswer). */
+export function filterNoteIdsWithFlashcards(noteIds: string[]): string[] {
+  return noteIds.filter((id) => flashcardData[id]?.interviewAnswer?.trim())
+}
+
+/** Fisher–Yates shuffle. Returns a new shuffled array. */
+export function shuffleNoteIds(noteIds: string[]): string[] {
+  const a = [...noteIds]
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[a[i], a[j]] = [a[j], a[i]]
+  }
+  return a
 }

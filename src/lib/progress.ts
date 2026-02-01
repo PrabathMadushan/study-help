@@ -1,35 +1,7 @@
 const STORAGE_KEY = 'study-progress'
 
-export type ProgressStatus = 'not_started' | 'in_progress' | 'completed'
-
 export type NoteProgress = {
-  status: ProgressStatus
-  lastViewedAt?: string
-  completedAt?: string
-  nextReviewAt?: string
-  lastReviewedAt?: string
-  reviewCount?: number
-}
-
-const REVIEW_INTERVAL_DAYS = [3, 7, 7] // first review +3d, second +7d, then +7d
-
-function addDays(date: Date, days: number): string {
-  const d = new Date(date)
-  d.setDate(d.getDate() + days)
-  return d.toISOString()
-}
-
-function isDue(p: NoteProgress): boolean {
-  if (p.status !== 'completed') return false
-  const now = Date.now()
-  if (p.nextReviewAt) {
-    return new Date(p.nextReviewAt).getTime() <= now
-  }
-  if (p.completedAt) {
-    const completedMs = new Date(p.completedAt).getTime()
-    return completedMs + 24 * 60 * 60 * 1000 <= now
-  }
-  return false
+  score?: number // 0–100 from Gemini validation
 }
 
 export type ProgressStore = Record<string, NoteProgress>
@@ -64,68 +36,24 @@ function save(store: ProgressStore): void {
 
 export function getProgress(noteId: string): NoteProgress {
   const store = load()
-  return store[noteId] ?? { status: 'not_started' }
+  return store[noteId] ?? {}
 }
 
 export function setProgress(noteId: string, update: Partial<NoteProgress>): void {
   const store = load()
-  const current = store[noteId] ?? { status: 'not_started' }
-  const next: NoteProgress = {
-    ...current,
-    ...update,
-  }
-  if (update.status === 'completed' && !next.completedAt) {
-    next.completedAt = new Date().toISOString()
-    next.nextReviewAt = addDays(new Date(), 1)
-  }
-  if (update.lastViewedAt === undefined && (update.status === 'in_progress' || update.status === 'completed')) {
-    next.lastViewedAt = new Date().toISOString()
-  }
+  const current = store[noteId] ?? {}
+  const next: NoteProgress = { ...current, ...update }
   const newStore = { ...store, [noteId]: next }
   save(newStore)
 }
 
-export function markViewed(noteId: string): void {
-  const current = getProgress(noteId)
-  if (current.status === 'not_started') {
-    setProgress(noteId, { status: 'in_progress', lastViewedAt: new Date().toISOString() })
-  } else {
-    setProgress(noteId, { lastViewedAt: new Date().toISOString() })
-  }
+export function setNoteScore(noteId: string, score: number): void {
+  const s = Math.min(100, Math.max(0, Math.round(score)))
+  setProgress(noteId, { score: s })
 }
 
-export function markCompleted(noteId: string): void {
-  setProgress(noteId, { status: 'completed' })
-}
-
-/**
- * Returns note IDs that are completed and due for review (nextReviewAt <= now, or no nextReviewAt and completedAt + 1 day <= now).
- */
-export function getNotesDueForReview(noteIds: string[], store: ProgressStore): string[] {
-  return noteIds.filter((id) => {
-    const p = store[id]
-    return p != null && isDue(p)
-  })
-}
-
-/**
- * Record that a note was reviewed. Advances fixed-interval ladder: first review +3d, second +7d, then +7d.
- */
-export function recordReview(noteId: string): void {
-  const store = load()
-  const current = store[noteId]
-  if (!current || current.status !== 'completed') return
-  const count = current.reviewCount ?? 0
-  const intervalIndex = Math.min(count, REVIEW_INTERVAL_DAYS.length - 1)
-  const days = REVIEW_INTERVAL_DAYS[intervalIndex]
-  const next: NoteProgress = {
-    ...current,
-    nextReviewAt: addDays(new Date(), days),
-    lastReviewedAt: new Date().toISOString(),
-    reviewCount: count + 1,
-  }
-  const newStore = { ...store, [noteId]: next }
-  save(newStore)
+export function markViewed(_noteId: string): void {
+  // No-op; we no longer track viewed separately. Kept for API compatibility.
 }
 
 export function markNotStarted(noteId: string): void {
@@ -135,24 +63,19 @@ export function markNotStarted(noteId: string): void {
 }
 
 /**
- * Progress % for a set of note ids: (completed + 0.5 * in_progress) / total * 100
+ * Progress % for a set of note ids: average of scores (unscored = 0).
  */
 export function computeProgressPercent(noteIds: string[]): number {
   if (noteIds.length === 0) return 0
   const store = load()
-  let score = 0
+  let sum = 0
   for (const id of noteIds) {
     const p = store[id]
-    if (!p || p.status === 'not_started') continue
-    if (p.status === 'completed') score += 1
-    else if (p.status === 'in_progress') score += 0.5
+    sum += p?.score ?? 0
   }
-  return Math.round((score / noteIds.length) * 100)
+  return Math.round(sum / noteIds.length)
 }
 
-/**
- * Overall progress % across all given note ids (same formula).
- */
 export function computeOverallProgressPercent(allNoteIds: string[]): number {
   return computeProgressPercent(allNoteIds)
 }

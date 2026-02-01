@@ -10,7 +10,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "firebase": "^10.14.0",
+    "@google/generative-ai": "^0.24.1",
+    "firebase": "^12.8.0",
     "prismjs": "^1.30.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",

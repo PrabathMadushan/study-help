@@ -2,21 +2,22 @@ export type NoteMeta = {
   id: string
   categoryId: string
   subcategoryId?: string
+  subSubcategoryId?: string
   title: string
   order: number
 }
 
 export const notesMeta: NoteMeta[] = [
-  { id: 'react-hooks-basics', categoryId: 'front-end', subcategoryId: 'react', title: '1. useState & useEffect — Core Hooks', order: 1 },
-  { id: 'react-usememo-usecallback-useref', categoryId: 'front-end', subcategoryId: 'react', title: '2. useMemo, useCallback & useRef', order: 2 },
-  { id: 'react-custom-hooks', categoryId: 'front-end', subcategoryId: 'react', title: '3. Custom Hooks & Logic Reuse', order: 3 },
-  { id: 'react-performance', categoryId: 'front-end', subcategoryId: 'react', title: '4. Performance: memo, Virtualization, Code Splitting', order: 4 },
-  { id: 'react-reconciliation-keys', categoryId: 'front-end', subcategoryId: 'react', title: '5. Reconciliation & Keys', order: 5 },
-  { id: 'react-error-boundaries', categoryId: 'front-end', subcategoryId: 'react', title: '6. Error Boundaries', order: 6 },
-  { id: 'react-context-vs-redux', categoryId: 'front-end', subcategoryId: 'react', title: '7. Context vs Redux — State Architecture', order: 7 },
-  { id: 'react-compound-components', categoryId: 'front-end', subcategoryId: 'react', title: '8. Compound Components & Composition', order: 8 },
-  { id: 'react-data-fetching', categoryId: 'front-end', subcategoryId: 'react', title: '9. Data Fetching Patterns', order: 9 },
-  { id: 'react-typescript', categoryId: 'front-end', subcategoryId: 'react', title: '10. TypeScript with React', order: 10 },
+  { id: 'react-hooks-basics', categoryId: 'front-end', subcategoryId: 'react', subSubcategoryId: 'hooks', title: '1. useState & useEffect — Core Hooks', order: 1 },
+  { id: 'react-usememo-usecallback-useref', categoryId: 'front-end', subcategoryId: 'react', subSubcategoryId: 'hooks', title: '2. useMemo, useCallback & useRef', order: 2 },
+  { id: 'react-custom-hooks', categoryId: 'front-end', subcategoryId: 'react', subSubcategoryId: 'hooks', title: '3. Custom Hooks & Logic Reuse', order: 3 },
+  { id: 'react-performance', categoryId: 'front-end', subcategoryId: 'react', subSubcategoryId: 'performance', title: '4. Performance: memo, Virtualization, Code Splitting', order: 4 },
+  { id: 'react-reconciliation-keys', categoryId: 'front-end', subcategoryId: 'react', subSubcategoryId: 'performance', title: '5. Reconciliation & Keys', order: 5 },
+  { id: 'react-error-boundaries', categoryId: 'front-end', subcategoryId: 'react', subSubcategoryId: 'patterns', title: '6. Error Boundaries', order: 6 },
+  { id: 'react-context-vs-redux', categoryId: 'front-end', subcategoryId: 'react', subSubcategoryId: 'patterns', title: '7. Context vs Redux — State Architecture', order: 7 },
+  { id: 'react-compound-components', categoryId: 'front-end', subcategoryId: 'react', subSubcategoryId: 'patterns', title: '8. Compound Components & Composition', order: 8 },
+  { id: 'react-data-fetching', categoryId: 'front-end', subcategoryId: 'react', subSubcategoryId: 'patterns', title: '9. Data Fetching Patterns', order: 9 },
+  { id: 'react-typescript', categoryId: 'front-end', subcategoryId: 'react', subSubcategoryId: 'typescript', title: '10. TypeScript with React', order: 10 },
   { id: 'js-closures', categoryId: 'front-end', subcategoryId: 'javascript', title: 'JavaScript Closures', order: 2 },
   { id: 'ts-interfaces', categoryId: 'front-end', subcategoryId: 'typescript', title: 'TypeScript Interfaces', order: 1 },
   { id: 'tailwind-utility', categoryId: 'front-end', subcategoryId: 'tailwind', title: 'Tailwind Utility Classes', order: 1 },

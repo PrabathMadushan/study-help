@@ -30,6 +30,7 @@ const router = createBrowserRouter([
       { path: 'review', element: <ReviewPage /> },
       { path: 'category/:id', element: <CategoryPage /> },
       { path: 'category/:id/:subId', element: <CategoryPage /> },
+      { path: 'category/:id/:subId/:subSubId', element: <CategoryPage /> },
       { path: 'note/:id', element: <NotePage /> },
     ],
   },
