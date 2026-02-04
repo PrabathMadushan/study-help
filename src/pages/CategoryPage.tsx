@@ -15,7 +15,6 @@ import { filterNoteIdsWithFlashcards } from '../data/flashcards'
 import { NoteListItem } from '../components/NoteListItem'
 import { SubcategoryCard } from '../components/SubcategoryCard'
 import { SubSubcategoryCard } from '../components/SubSubcategoryCard'
-import { ProgressBar, CircularProgress } from '../components/ProgressBar'
 import { useProgress } from '../hooks/useProgress'
 
 function PageHeader({

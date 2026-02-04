@@ -9,7 +9,7 @@ import {
   subcategoryHasSubSubcategories,
 } from '../data/subSubcategories'
 import { getNotesByCategoryId } from '../data/notes'
-import { ProgressBar, CircularProgress } from '../components/ProgressBar'
+import { ProgressBar } from '../components/ProgressBar'
 import { useProgress } from '../hooks/useProgress'
 
 function ScoreBadge({ score }: { score: number | undefined }) {
