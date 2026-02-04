@@ -15,6 +15,7 @@ type ReviewLocationState = { noteIds?: string[]; startDeck?: 'all' } | null
 function useSpeechRecognition() {
   const [listening, setListening] = useState(false)
   const [supported, setSupported] = useState(false)
+  const [permissionState, setPermissionState] = useState<'prompt' | 'granted' | 'denied' | 'unknown'>('unknown')
   const recognitionRef = useRef<SpeechRecognition | null>(null)
 
   useEffect(() => {
@@ -27,15 +28,52 @@ function useSpeechRecognition() {
       recognitionRef.current.interimResults = true
       recognitionRef.current.lang = 'en-US'
     }
+
+    // Check microphone permission status
+    if (navigator.permissions) {
+      navigator.permissions.query({ name: 'microphone' as PermissionName }).then((result) => {
+        setPermissionState(result.state as 'prompt' | 'granted' | 'denied')
+        result.onchange = () => {
+          setPermissionState(result.state as 'prompt' | 'granted' | 'denied')
+        }
+      }).catch(() => {
+        // Permissions API not supported for microphone, will prompt on first use
+        setPermissionState('unknown')
+      })
+    }
+
     return () => {
       recognitionRef.current?.abort()
     }
   }, [])
 
+  // Request microphone permission explicitly
+  const requestPermission = useCallback(async (): Promise<boolean> => {
+    try {
+      // Request microphone access through getUserMedia
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      // Stop the stream immediately - we just needed permission
+      stream.getTracks().forEach(track => track.stop())
+      setPermissionState('granted')
+      return true
+    } catch (error) {
+      console.error('Microphone permission denied:', error)
+      setPermissionState('denied')
+      return false
+    }
+  }, [])
+
   const startListening = useCallback(
-    (onResult: (transcript: string) => void) => {
+    async (onResult: (transcript: string) => void) => {
       const rec = recognitionRef.current
       if (!rec) return
+
+      // If permission not granted, request it first
+      if (permissionState !== 'granted' && permissionState !== 'unknown') {
+        const granted = await requestPermission()
+        if (!granted) return
+      }
+
       rec.onresult = (e: SpeechRecognitionEvent) => {
         const transcript = Array.from(e.results)
           .map((r: SpeechRecognitionResult) => r[0].transcript)
@@ -43,11 +81,20 @@ function useSpeechRecognition() {
         onResult(transcript)
       }
       rec.onend = () => setListening(false)
-      rec.onerror = () => setListening(false)
-      rec.start()
-      setListening(true)
+      rec.onerror = () => {
+        setListening(false)
+        setPermissionState('denied')
+      }
+      
+      try {
+        rec.start()
+        setListening(true)
+      } catch (error) {
+        console.error('Failed to start speech recognition:', error)
+        setListening(false)
+      }
     },
-    []
+    [permissionState, requestPermission]
   )
 
   const stopListening = useCallback(() => {
@@ -55,7 +102,7 @@ function useSpeechRecognition() {
     setListening(false)
   }, [])
 
-  return { startListening, stopListening, listening, supported }
+  return { startListening, stopListening, listening, supported, permissionState, requestPermission }
 }
 
 function useSpeechSynthesis() {
@@ -113,7 +160,7 @@ export function ReviewPage() {
   const [scoreResult, setScoreResult] = useState<{ score: number; feedback?: string } | null>(null)
   const [validating, setValidating] = useState(false)
   const { setNoteScore } = useProgress()
-  const { startListening, stopListening, listening, supported: speechRecognitionSupported } = useSpeechRecognition()
+  const { startListening, stopListening, listening, supported: speechRecognitionSupported, permissionState: micPermission } = useSpeechRecognition()
   const { speak, supported: ttsSupported } = useSpeechSynthesis()
 
   const allNoteIds = getNoteIdsWithFlashcards()
@@ -317,16 +364,32 @@ export function ReviewPage() {
               <button
                 type="button"
                 onClick={() => (listening ? stopListening() : startListening(handleMicResult))}
+                disabled={micPermission === 'denied'}
                 className={`absolute right-3 top-3 p-2 rounded-lg transition-all ${
-                  listening
-                    ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 animate-pulse'
-                    : 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
+                  micPermission === 'denied'
+                    ? 'bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-600 cursor-not-allowed'
+                    : listening
+                      ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 animate-pulse'
+                      : 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
                 }`}
-                title={listening ? 'Stop listening' : 'Start voice input'}
+                title={
+                  micPermission === 'denied'
+                    ? 'Microphone access denied. Please enable it in browser settings.'
+                    : listening
+                      ? 'Stop listening'
+                      : 'Start voice input'
+                }
               >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-                </svg>
+                {micPermission === 'denied' ? (
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />
+                  </svg>
+                ) : (
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                  </svg>
+                )}
               </button>
             )}
           </div>

@@ -10,24 +10,24 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['vite.svg'],
+      includeAssets: ['favicon.svg', 'icon.svg'],
       manifest: {
-        name: 'Study Notes',
-        short_name: 'Study Notes',
-        description: 'Interview prep study notes with flashcards and spaced repetition',
-        theme_color: '#4f46e5',
-        background_color: '#f9fafb',
+        name: 'StudyPro',
+        short_name: 'StudyPro',
+        description: 'Interview prep study notes with flashcards and AI-powered feedback',
+        theme_color: '#7c3aed',
+        background_color: '#f8fafc',
         display: 'standalone',
         start_url: '/',
         icons: [
           {
-            src: '/vite.svg',
+            src: '/favicon.svg',
             sizes: 'any',
             type: 'image/svg+xml',
             purpose: 'any',
           },
           {
-            src: '/vite.svg',
+            src: '/icon.svg',
             sizes: 'any',
             type: 'image/svg+xml',
             purpose: 'maskable',
