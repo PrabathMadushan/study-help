@@ -82,7 +82,11 @@ export async function setProgress(uid: string, noteId: string, update: Partial<N
 }
 
 export async function setNoteScore(uid: string, noteId: string, score: number): Promise<void> {
-  const s = Math.min(100, Math.max(0, Math.round(score)))
+  const store = getSnapshot(uid)
+  const current = store[noteId]
+  const oldScore = typeof current?.score === 'number' ? current.score : null
+  const newScoreRaw = oldScore != null ? (oldScore + score) / 2 : score
+  const s = Math.min(100, Math.max(0, Math.round(newScoreRaw)))
   await setProgress(uid, noteId, { score: s })
 }
 

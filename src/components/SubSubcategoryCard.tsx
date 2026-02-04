@@ -29,30 +29,69 @@ export function SubSubcategoryCard({ subSubcategory }: SubSubcategoryCardProps) 
   const canPractice = practiceIds.length > 0
 
   return (
-    <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-5 shadow-sm hover:shadow-md hover:border-indigo-300 dark:hover:border-indigo-600 transition-all duration-200">
+    <div className="group relative rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900/50 overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1 hover:border-violet-300 dark:hover:border-violet-700">
+      {/* Gradient overlay on hover */}
+      <div className="absolute inset-0 bg-gradient-to-br from-violet-500/5 to-purple-500/5 dark:from-violet-500/10 dark:to-purple-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+      
       <Link
         to={`/category/${subSubcategory.categoryId}/${subSubcategory.subcategoryId}/${subSubcategory.id}`}
-        className="block focus:outline-none focus:ring-0"
+        className="relative block p-5"
       >
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{subSubcategory.name}</h2>
-        {subSubcategory.description && (
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{subSubcategory.description}</p>
-        )}
-        <div className="mt-3 flex items-center gap-3">
-          <ProgressBar value={progress} className="flex-1" showLabel />
-          <span className="text-xs text-gray-500 dark:text-gray-400">{noteCount} notes</span>
+        <div className="flex items-start gap-3">
+          <div className="shrink-0 w-10 h-10 rounded-lg bg-gradient-to-br from-purple-100 to-fuchsia-100 dark:from-purple-900/50 dark:to-fuchsia-900/50 flex items-center justify-center">
+            <svg className="w-5 h-5 text-purple-600 dark:text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+            </svg>
+          </div>
+          <div className="flex-1 min-w-0">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white group-hover:text-violet-700 dark:group-hover:text-violet-300 transition-colors">
+              {subSubcategory.name}
+            </h2>
+            {subSubcategory.description && (
+              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400 line-clamp-2">
+                {subSubcategory.description}
+              </p>
+            )}
+          </div>
+        </div>
+        
+        <div className="mt-4 flex items-center gap-3">
+          <div className="flex-1">
+            <ProgressBar value={progress} size="sm" />
+          </div>
+          <span className="text-sm font-medium text-gray-500 dark:text-gray-400 tabular-nums">
+            {progress}%
+          </span>
+        </div>
+        
+        <div className="mt-3 flex items-center justify-between">
+          <span className="text-xs text-gray-400 dark:text-gray-500">
+            {noteCount} {noteCount === 1 ? 'note' : 'notes'}
+          </span>
+          <span className="text-xs font-medium text-violet-600 dark:text-violet-400 group-hover:translate-x-1 transition-transform inline-flex items-center gap-1">
+            View notes
+            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+            </svg>
+          </span>
         </div>
       </Link>
+      
       {canPractice && (
-        <Link
-          to="/review"
-          state={{ noteIds }}
-          onClick={(e) => e.stopPropagation()}
-          className="mt-3 flex w-full items-center justify-center rounded-lg border border-indigo-600 bg-indigo-50 px-3 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-100 dark:border-indigo-500 dark:bg-indigo-900/20 dark:text-indigo-300 dark:hover:bg-indigo-900/40"
-          aria-label={`Practice ${practiceIds.length} interview questions from ${subSubcategory.name} (random order)`}
-        >
-          Practice
-        </Link>
+        <div className="relative px-5 pb-5">
+          <Link
+            to="/review"
+            state={{ noteIds }}
+            onClick={(e) => e.stopPropagation()}
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 px-4 py-2.5 text-sm font-semibold text-white hover:from-violet-700 hover:to-purple-700 transition-all shadow-lg shadow-violet-500/25 hover:shadow-violet-500/40"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            Practice
+          </Link>
+        </div>
       )}
     </div>
   )

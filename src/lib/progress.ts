@@ -48,7 +48,11 @@ export function setProgress(noteId: string, update: Partial<NoteProgress>): void
 }
 
 export function setNoteScore(noteId: string, score: number): void {
-  const s = Math.min(100, Math.max(0, Math.round(score)))
+  const store = load()
+  const current = store[noteId]
+  const oldScore = typeof current?.score === 'number' ? current.score : null
+  const newScoreRaw = oldScore != null ? (oldScore + score) / 2 : score
+  const s = Math.min(100, Math.max(0, Math.round(newScoreRaw)))
   setProgress(noteId, { score: s })
 }
 
