@@ -82,7 +82,7 @@ export function NotePage() {
   ].filter(Boolean) as { label: string; to: string }[]
 
   return (
-    <article className="max-w-3xl mx-auto">
+    <article className="max-w-6xl mx-auto">
       {/* Breadcrumbs */}
       <nav className="flex flex-wrap items-center gap-x-1 gap-y-1 text-xs sm:text-sm mb-4 sm:mb-6 leading-none">
         {breadcrumbs.map((crumb, i) => (
@@ -110,7 +110,7 @@ export function NotePage() {
           </h1>
           {progress?.score != null && <ScoreBadge score={progress.score} />}
         </div>
-        
+
         <div className="flex flex-wrap items-center gap-4">
           <Link
             to={backTo}
@@ -121,7 +121,7 @@ export function NotePage() {
             </svg>
             Back to {backLabel}
           </Link>
-          
+
           <Link
             to="/review"
             state={{ noteIds: [note.id] }}
@@ -184,13 +184,12 @@ export function NotePage() {
         <div className="mt-8 rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900/50 p-6">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div className="flex items-center gap-4">
-              <div className={`w-14 h-14 rounded-xl flex items-center justify-center text-white font-bold text-lg shadow-lg ${
-                progress.score >= 70
+              <div className={`w-14 h-14 rounded-xl flex items-center justify-center text-white font-bold text-lg shadow-lg ${progress.score >= 70
                   ? 'bg-gradient-to-br from-emerald-500 to-teal-500'
                   : progress.score >= 40
                     ? 'bg-gradient-to-br from-amber-500 to-orange-500'
                     : 'bg-gradient-to-br from-red-500 to-rose-500'
-              }`}>
+                }`}>
                 {progress.score}
               </div>
               <div>
