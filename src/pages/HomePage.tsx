@@ -1,14 +1,32 @@
-import { Link } from 'react-router-dom'
-import { categories } from '../data/categories'
+import { Link, Navigate } from 'react-router-dom'
+import { useSubject } from '../contexts/SubjectContext'
+import { useCategories } from '../hooks/useCategories'
+import { useSubjects } from '../hooks/useSubjects'
 import { CategoryCard } from '../components/CategoryCard'
 import { getNoteIdsWithFlashcards } from '../data/flashcards'
 import { useProgress } from '../hooks/useProgress'
+import { LoadingScreen } from '../components/LoadingScreen'
 
 export function HomePage() {
+  const { currentSubjectId } = useSubject()
+  const { subjects } = useSubjects()
+  const { categories, loading: categoriesLoading } = useCategories(currentSubjectId)
   const hasFlashcards = getNoteIdsWithFlashcards().length > 0
   const flashcardCount = getNoteIdsWithFlashcards().length
   const { getOverallProgress } = useProgress()
   const overallProgress = getOverallProgress()
+
+  // Redirect to subjects page if no subject is selected and subjects exist
+  if (!currentSubjectId && subjects.length > 0) {
+    return <Navigate to="/subjects" replace />
+  }
+
+  // Show loading while fetching categories
+  if (categoriesLoading) {
+    return <LoadingScreen />
+  }
+
+  const currentSubject = subjects.find((s) => s.id === currentSubjectId)
 
   return (
     <div className="space-y-6 sm:space-y-10">
@@ -21,10 +39,10 @@ export function HomePage() {
           <div className="flex items-start justify-between gap-4 mb-4">
             <div className="flex-1 min-w-0">
               <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold mb-2">
-                Welcome back!
+                {currentSubject ? `${currentSubject.icon} ${currentSubject.name}` : 'Welcome back!'}
               </h1>
               <p className="text-violet-100 text-sm sm:text-base lg:text-lg max-w-xl">
-                Master your interview skills with structured study notes and AI-powered practice.
+                {currentSubject ? currentSubject.description : 'Master your interview skills with structured study notes and AI-powered practice.'}
               </p>
             </div>
             

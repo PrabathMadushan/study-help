@@ -19,6 +19,7 @@ import {
   setNoteScore as setNoteScoreFirestore,
 } from '../lib/progressFirestore'
 import { useAuth } from '../contexts/AuthContext'
+import { useSubject } from '../contexts/SubjectContext'
 import { notes } from '../data/notes'
 
 function getLocalSnapshot(): ProgressStore {
@@ -40,56 +41,57 @@ export function notifyProgress(): void {
 
 export function useProgress() {
   const { user } = useAuth()
+  const { currentSubjectId } = useSubject()
 
   const subscribeStore = useCallback(
     (callback: () => void) => {
-      if (!user) return subscribeLocal(callback)
-      return firestoreSubscribe(user.uid, callback)
+      if (!user || !currentSubjectId) return subscribeLocal(callback)
+      return firestoreSubscribe(user.uid, currentSubjectId, callback)
     },
-    [user]
+    [user, currentSubjectId]
   )
 
   const getSnapshotStore = useCallback((): ProgressStore => {
-    if (!user) return getLocalSnapshot()
-    return firestoreGetSnapshot(user.uid)
-  }, [user])
+    if (!user || !currentSubjectId) return getLocalSnapshot()
+    return firestoreGetSnapshot(user.uid, currentSubjectId)
+  }, [user, currentSubjectId])
 
   const store = useSyncExternalStore(subscribeStore, getSnapshotStore, getSnapshotStore)
 
   const setNoteViewed = useCallback(
     (noteId: string) => {
-      if (user) {
-        firestoreMarkViewed(user.uid, noteId)
+      if (user && currentSubjectId) {
+        firestoreMarkViewed(user.uid, currentSubjectId, noteId)
       } else {
         markViewed(noteId)
         notifyProgress()
       }
     },
-    [user]
+    [user, currentSubjectId]
   )
 
   const setNoteScore = useCallback(
     (noteId: string, score: number) => {
-      if (user) {
-        setNoteScoreFirestore(user.uid, noteId, score)
+      if (user && currentSubjectId) {
+        setNoteScoreFirestore(user.uid, currentSubjectId, noteId, score)
       } else {
         setNoteScoreLocal(noteId, score)
         notifyProgress()
       }
     },
-    [user]
+    [user, currentSubjectId]
   )
 
   const setNoteNotStarted = useCallback(
     (noteId: string) => {
-      if (user) {
-        firestoreMarkNotStarted(user.uid, noteId)
+      if (user && currentSubjectId) {
+        firestoreMarkNotStarted(user.uid, currentSubjectId, noteId)
       } else {
         markNotStarted(noteId)
         notifyProgress()
       }
     },
-    [user]
+    [user, currentSubjectId]
   )
 
   const getNoteProgress = useCallback(

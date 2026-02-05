@@ -17,17 +17,12 @@ function useSpeechRecognition() {
   const [supported, setSupported] = useState(false)
   const [permissionState, setPermissionState] = useState<'prompt' | 'granted' | 'denied' | 'unknown'>('unknown')
   const recognitionRef = useRef<SpeechRecognition | null>(null)
+  const finalTranscriptRef = useRef('')
 
   useEffect(() => {
     const SpeechRecognitionAPI =
       window.SpeechRecognition || window.webkitSpeechRecognition
     setSupported(!!SpeechRecognitionAPI)
-    if (SpeechRecognitionAPI) {
-      recognitionRef.current = new SpeechRecognitionAPI()
-      recognitionRef.current.continuous = true
-      recognitionRef.current.interimResults = true
-      recognitionRef.current.lang = 'en-US'
-    }
 
     // Check microphone permission status
     if (navigator.permissions) {
@@ -37,22 +32,25 @@ function useSpeechRecognition() {
           setPermissionState(result.state as 'prompt' | 'granted' | 'denied')
         }
       }).catch(() => {
-        // Permissions API not supported for microphone, will prompt on first use
         setPermissionState('unknown')
       })
     }
 
     return () => {
-      recognitionRef.current?.abort()
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.stop()
+        } catch (e) {
+          // Ignore errors on cleanup
+        }
+      }
     }
   }, [])
 
   // Request microphone permission explicitly
   const requestPermission = useCallback(async (): Promise<boolean> => {
     try {
-      // Request microphone access through getUserMedia
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      // Stop the stream immediately - we just needed permission
       stream.getTracks().forEach(track => track.stop())
       setPermissionState('granted')
       return true
@@ -65,29 +63,76 @@ function useSpeechRecognition() {
 
   const startListening = useCallback(
     async (onResult: (transcript: string) => void) => {
-      const rec = recognitionRef.current
-      if (!rec) return
-
       // If permission not granted, request it first
       if (permissionState !== 'granted' && permissionState !== 'unknown') {
         const granted = await requestPermission()
         if (!granted) return
       }
 
-      rec.onresult = (e: SpeechRecognitionEvent) => {
-        const transcript = Array.from(e.results)
-          .map((r: SpeechRecognitionResult) => r[0].transcript)
-          .join(' ')
-        onResult(transcript)
+      const SpeechRecognitionAPI =
+        window.SpeechRecognition || window.webkitSpeechRecognition
+      if (!SpeechRecognitionAPI) return
+
+      // Stop any existing recognition
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.stop()
+        } catch (e) {
+          // Ignore
+        }
       }
-      rec.onend = () => setListening(false)
-      rec.onerror = () => {
-        setListening(false)
-        setPermissionState('denied')
-      }
+
+      // Create a fresh instance each time for mobile reliability
+      const recognition = new SpeechRecognitionAPI()
+      recognition.continuous = true
+      recognition.interimResults = true
+      recognition.lang = 'en-US'
       
+      // Reset final transcript
+      finalTranscriptRef.current = ''
+
+      // Set up handlers BEFORE starting
+      recognition.onresult = (event: SpeechRecognitionEvent) => {
+        console.log('Speech recognition result received')
+        let interimTranscript = ''
+        let finalTranscript = ''
+
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const transcript = event.results[i][0].transcript
+          if (event.results[i].isFinal) {
+            finalTranscript += transcript + ' '
+          } else {
+            interimTranscript += transcript
+          }
+        }
+
+        if (finalTranscript) {
+          finalTranscriptRef.current += finalTranscript
+        }
+
+        // Send the combined text (final + interim)
+        const combined = finalTranscriptRef.current + interimTranscript
+        if (combined.trim()) {
+          onResult(combined.trim())
+        }
+      }
+
+      recognition.onerror = () => {
+        console.error('Speech recognition error')
+        setListening(false)
+      }
+
+      recognition.onend = () => {
+        console.log('Speech recognition ended')
+        setListening(false)
+      }
+
+      recognitionRef.current = recognition
+
+      // Start recognition
       try {
-        rec.start()
+        recognition.start()
+        console.log('Speech recognition started')
         setListening(true)
       } catch (error) {
         console.error('Failed to start speech recognition:', error)
@@ -98,7 +143,15 @@ function useSpeechRecognition() {
   )
 
   const stopListening = useCallback(() => {
-    recognitionRef.current?.stop()
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.stop()
+      } catch (error) {
+        console.error('Error stopping recognition:', error)
+      }
+      recognitionRef.current = null
+    }
+    finalTranscriptRef.current = ''
     setListening(false)
   }, [])
 
@@ -220,6 +273,7 @@ export function ReviewPage() {
   }
 
   const handleMicResult = useCallback((transcript: string) => {
+    // Update the answer with the transcript (includes accumulated + current)
     setUserAnswer(transcript)
   }, [])
 

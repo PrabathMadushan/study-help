@@ -33,11 +33,11 @@ service cloud.firestore {
       allow delete: if false;
       
       // ============================================
-      // PROGRESS SUBCOLLECTION
-      // Path: /users/{userId}/progress/{docId}
-      // Stores study progress with structure: { notes: { [noteId]: { score: number } } }
+      // PROGRESS SUBCOLLECTION - PER SUBJECT
+      // Path: /users/{userId}/progress/{subjectId}/state
+      // Stores study progress per subject: { notes: { [noteId]: { score: number } } }
       // ============================================
-      match /progress/{docId} {
+      match /progress/{subjectId}/{docId} {
         // Users can read their own progress
         allow read: if isOwner(userId);
         
@@ -54,6 +54,73 @@ service cloud.firestore {
         // Prevent deletion of progress data
         allow delete: if false;
       }
+    }
+    
+    // ============================================
+    // ADMIN COLLECTION
+    // Path: /admins/{userId}
+    // ============================================
+    match /admins/{adminId} {
+      // Anyone authenticated can read (to check if they're admin)
+      allow read: if request.auth != null;
+      
+      // Only existing admins can create new admins
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+    
+    // ============================================
+    // SUBJECTS (Super Categories)
+    // Path: /subjects/{subjectId}
+    // ============================================
+    match /subjects/{subjectId} {
+      // All authenticated users can read subjects
+      allow read: if request.auth != null;
+      
+      // Only admins can create, update, delete subjects
+      allow create, update: if isAdmin() && isValidSubject();
+      allow delete: if isAdmin();
+    }
+    
+    // ============================================
+    // CATEGORIES
+    // Path: /categories/{categoryId}
+    // ============================================
+    match /categories/{categoryId} {
+      allow read: if request.auth != null;
+      allow create, update: if isAdmin() && isValidCategory();
+      allow delete: if isAdmin();
+    }
+    
+    // ============================================
+    // SUBCATEGORIES
+    // Path: /subcategories/{subcategoryId}
+    // ============================================
+    match /subcategories/{subcategoryId} {
+      allow read: if request.auth != null;
+      allow create, update: if isAdmin() && isValidSubcategory();
+      allow delete: if isAdmin();
+    }
+    
+    // ============================================
+    // SUB-SUBCATEGORIES
+    // Path: /subSubcategories/{subSubcategoryId}
+    // ============================================
+    match /subSubcategories/{subSubcategoryId} {
+      allow read: if request.auth != null;
+      allow create, update: if isAdmin() && isValidSubSubcategory();
+      allow delete: if isAdmin();
+    }
+    
+    // ============================================
+    // NOTES
+    // Path: /notes/{noteId}
+    // ============================================
+    match /notes/{noteId} {
+      allow read: if request.auth != null;
+      allow create, update: if isAdmin() && isValidNote();
+      allow delete: if isAdmin();
     }
     
     // ============================================
@@ -97,6 +164,72 @@ service cloud.firestore {
         && data.notes is map
         // Limit total size to prevent abuse (max 1000 notes)
         && data.notes.size() <= 1000;
+    }
+    
+    // Check if user is an admin
+    function isAdmin() {
+      return request.auth != null 
+        && exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+        && get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.role == 'admin';
+    }
+    
+    // Validate subject document
+    function isValidSubject() {
+      let data = request.resource.data;
+      return data.keys().hasOnly(['name', 'description', 'icon', 'color', 'order', 'createdAt', 'updatedAt'])
+        && data.name is string && data.name.size() <= 200
+        && data.order is number
+        && (!('description' in data) || (data.description is string && data.description.size() <= 1000))
+        && (!('icon' in data) || (data.icon is string && data.icon.size() <= 100))
+        && (!('color' in data) || (data.color is string && data.color.size() <= 50));
+    }
+    
+    // Validate category document
+    function isValidCategory() {
+      let data = request.resource.data;
+      return data.keys().hasOnly(['subjectId', 'name', 'description', 'icon', 'order', 'createdAt', 'updatedAt'])
+        && data.subjectId is string && data.subjectId.size() <= 100
+        && data.name is string && data.name.size() <= 200
+        && data.order is number
+        && (!('description' in data) || (data.description is string && data.description.size() <= 1000))
+        && (!('icon' in data) || (data.icon is string && data.icon.size() <= 100));
+    }
+    
+    // Validate subcategory document
+    function isValidSubcategory() {
+      let data = request.resource.data;
+      return data.keys().hasOnly(['subjectId', 'categoryId', 'name', 'description', 'order', 'createdAt', 'updatedAt'])
+        && data.subjectId is string && data.subjectId.size() <= 100
+        && data.categoryId is string && data.categoryId.size() <= 100
+        && data.name is string && data.name.size() <= 200
+        && data.order is number
+        && (!('description' in data) || (data.description is string && data.description.size() <= 1000));
+    }
+    
+    // Validate sub-subcategory document
+    function isValidSubSubcategory() {
+      let data = request.resource.data;
+      return data.keys().hasOnly(['subjectId', 'categoryId', 'subcategoryId', 'name', 'description', 'order', 'createdAt', 'updatedAt'])
+        && data.subjectId is string && data.subjectId.size() <= 100
+        && data.categoryId is string && data.categoryId.size() <= 100
+        && data.subcategoryId is string && data.subcategoryId.size() <= 100
+        && data.name is string && data.name.size() <= 200
+        && data.order is number
+        && (!('description' in data) || (data.description is string && data.description.size() <= 1000));
+    }
+    
+    // Validate note document
+    function isValidNote() {
+      let data = request.resource.data;
+      return data.keys().hasOnly(['subjectId', 'categoryId', 'subcategoryId', 'subSubcategoryId', 'title', 'content', 'interviewAnswer', 'order', 'createdAt', 'updatedAt'])
+        && data.subjectId is string && data.subjectId.size() <= 100
+        && data.categoryId is string && data.categoryId.size() <= 100
+        && data.title is string && data.title.size() <= 500
+        && data.content is string && data.content.size() <= 100000
+        && data.order is number
+        && (!('subcategoryId' in data) || (data.subcategoryId is string && data.subcategoryId.size() <= 100))
+        && (!('subSubcategoryId' in data) || (data.subSubcategoryId is string && data.subSubcategoryId.size() <= 100))
+        && (!('interviewAnswer' in data) || (data.interviewAnswer is string && data.interviewAnswer.size() <= 5000));
     }
   }
 }

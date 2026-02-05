@@ -1,11 +1,18 @@
 import { useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
+import { useNote } from '../hooks/useNotes'
+import { useProgress } from '../hooks/useProgress'
+import { LoadingScreen } from '../components/LoadingScreen'
+import { doc, getDoc } from 'firebase/firestore'
+import { getFirestoreDb } from '../lib/firebase'
+import { useState } from 'react'
+
+// Temporary fallback to static data
 import { getNoteById } from '../data/notes'
 import { getCategoryById } from '../data/categories'
 import { getSubcategoryById } from '../data/subcategories'
 import { getSubSubcategoryById } from '../data/subSubcategories'
 import { noteContents } from '../notes'
-import { useProgress } from '../hooks/useProgress'
 
 function ScoreBadge({ score }: { score: number }) {
   const variant =
@@ -27,24 +34,75 @@ function ScoreBadge({ score }: { score: number }) {
 
 export function NotePage() {
   const { id } = useParams<{ id: string }>()
-  const note = id ? getNoteById(id) : undefined
-  const category = note ? getCategoryById(note.categoryId) : undefined
-  const subcategory = note?.subcategoryId && note.categoryId
-    ? getSubcategoryById(note.categoryId, note.subcategoryId)
-    : undefined
-  const subSubcategory =
-    note?.subcategoryId && note.subSubcategoryId && note.categoryId
-      ? getSubSubcategoryById(note.categoryId, note.subcategoryId, note.subSubcategoryId)
-      : undefined
+  const { note: dynamicNote, loading: noteLoading } = useNote(id)
+  const [category, setCategory] = useState<any>(null)
+  const [subcategory, setSubcategory] = useState<any>(null)
+  const [subSubcategory, setSubSubcategory] = useState<any>(null)
   const { getNoteProgress, setNoteViewed } = useProgress()
+  
+  // Fallback to static data if dynamic note not found
+  const staticNote = id ? getNoteById(id) : undefined
+  const note = dynamicNote || staticNote
+  const isUsingDynamicData = !!dynamicNote
+  
   const progress = note ? getNoteProgress(note.id) : undefined
-  const getContent = note ? noteContents[note.id] : null
+  const getContent = note && !isUsingDynamicData ? noteContents[note.id] : null
+
+  // Fetch related entities (category, subcategory, subSubcategory)
+  useEffect(() => {
+    if (!note) return
+
+    const fetchRelatedData = async () => {
+      try {
+        if (note.categoryId) {
+          const catDoc = await getDoc(doc(getFirestoreDb(), 'categories', note.categoryId))
+          if (catDoc.exists()) {
+            setCategory({ id: catDoc.id, ...catDoc.data() })
+          } else {
+            setCategory(getCategoryById(note.categoryId))
+          }
+        }
+
+        if (note.subcategoryId) {
+          const subDoc = await getDoc(doc(getFirestoreDb(), 'subcategories', note.subcategoryId))
+          if (subDoc.exists()) {
+            setSubcategory({ id: subDoc.id, ...subDoc.data() })
+          } else if (note.categoryId) {
+            setSubcategory(getSubcategoryById(note.categoryId, note.subcategoryId))
+          }
+        }
+
+        if (note.subSubcategoryId) {
+          const subSubDoc = await getDoc(doc(getFirestoreDb(), 'subSubcategories', note.subSubcategoryId))
+          if (subSubDoc.exists()) {
+            setSubSubcategory({ id: subSubDoc.id, ...subSubDoc.data() })
+          } else if (note.categoryId && note.subcategoryId) {
+            setSubSubcategory(getSubSubcategoryById(note.categoryId, note.subcategoryId, note.subSubcategoryId))
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching related data:', error)
+        // Fallback to static data
+        if (note.categoryId) setCategory(getCategoryById(note.categoryId))
+        if (note.subcategoryId && note.categoryId) setSubcategory(getSubcategoryById(note.categoryId, note.subcategoryId))
+        if (note.subSubcategoryId && note.subcategoryId && note.categoryId) {
+          setSubSubcategory(getSubSubcategoryById(note.categoryId, note.subcategoryId, note.subSubcategoryId))
+        }
+      }
+    }
+
+    fetchRelatedData()
+  }, [note?.id, note?.categoryId, note?.subcategoryId, note?.subSubcategoryId])
 
   useEffect(() => {
     if (note) {
       setNoteViewed(note.id)
     }
   }, [note?.id, setNoteViewed])
+
+  if (noteLoading) {
+    return <LoadingScreen />
+  }
 
   if (!id || !note) {
     return (
@@ -138,7 +196,12 @@ export function NotePage() {
 
       {/* Content */}
       <div className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900/50 p-6 sm:p-8 shadow-sm">
-        {getContent ? (
+        {isUsingDynamicData && dynamicNote ? (
+          <div 
+            className="note-body prose dark:prose-invert max-w-none"
+            dangerouslySetInnerHTML={{ __html: dynamicNote.content }}
+          />
+        ) : getContent ? (
           <div className="note-body">
             {getContent()}
           </div>
