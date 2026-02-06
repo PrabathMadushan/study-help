@@ -10,6 +10,12 @@ export type ScoreResult = {
 /**
  * Validates user's flashcard answer against the model answer using Google AI (Gemini).
  * Returns a score 0–100. Requires VITE_GEMINI_API_KEY in .env (get key from https://aistudio.google.com/apikey).
+ * 
+ * Improvements:
+ * - Uses gemini-1.5-flash for better stability and higher free-tier rate limits
+ * - System instructions keep persona separate from prompt for better JSON compliance
+ * - Enforces JSON mode with responseMimeType: 'application/json'
+ * - Lower temperature (0.3) for more consistent grading
  */
 export async function validateFlashcardAnswer(
   userAnswer: string,
@@ -21,11 +27,18 @@ export async function validateFlashcardAnswer(
   }
 
   const genAI = new GoogleGenerativeAI(apiKey)
-  const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' })
 
-  const prompt = `You are an interviewer grading a candidate's answer.
+  // Use gemini-1.5-flash for better stability and higher rate limits
+  const model = genAI.getGenerativeModel({
+    model: 'gemini-2.5-flash-lite',
+    systemInstruction: 'You are an interviewer grading a candidate\'s answer. Respond ONLY with a JSON object containing "score" (0-100) and "feedback" (one short sentence).',
+    generationConfig: {
+      responseMimeType: 'application/json',
+      temperature: 0.3, // Lower temperature for more consistent grading
+    }
+  })
 
-Model (ideal) answer:
+  const prompt = `Model (ideal) answer:
 """
 ${modelAnswer}
 """
@@ -40,21 +53,35 @@ Grade the candidate's answer for correctness and completeness compared to the mo
 - Accuracy (no wrong claims)
 - Conciseness (bonus for clear, concise answers)
 
-Respond with ONLY a JSON object, no other text:
-{"score": <number 0-100>, "feedback": "<one short sentence>"}
+Return a JSON object with:
+- "score": number between 0-100
+- "feedback": one short sentence explaining the grade
+
 Example: {"score": 85, "feedback": "Good coverage of main points; missed one detail about X."}`
 
   try {
     const result = await model.generateContent(prompt)
     const text = result.response.text()
-    const json = extractJson(text)
-    if (json == null) {
-      return { score: 0, feedback: 'Could not parse score from response.' }
-    }
-    const score = Math.min(100, Math.max(0, Number(json.score) ?? 0))
-    return {
-      score: Math.round(score),
-      feedback: typeof json.feedback === 'string' ? json.feedback : undefined,
+
+    // Try to parse JSON directly (should work with responseMimeType: 'application/json')
+    try {
+      const json = JSON.parse(text) as { score?: number; feedback?: string }
+      const score = Math.min(100, Math.max(0, Number(json.score) ?? 0))
+      return {
+        score: Math.round(score),
+        feedback: typeof json.feedback === 'string' ? json.feedback : undefined,
+      }
+    } catch {
+      // Fallback to extractJson if direct parsing fails
+      const json = extractJson(text)
+      if (json == null) {
+        return { score: 0, feedback: 'Could not parse score from response.' }
+      }
+      const score = Math.min(100, Math.max(0, Number(json.score) ?? 0))
+      return {
+        score: Math.round(score),
+        feedback: typeof json.feedback === 'string' ? json.feedback : undefined,
+      }
     }
   } catch (e) {
     console.error('Gemini validation error', e)

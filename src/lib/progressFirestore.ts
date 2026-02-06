@@ -18,7 +18,7 @@ function getCacheKey(uid: string, subjectId: string): string {
 }
 
 function getProgressRef(uid: string, subjectId: string) {
-  return doc(getFirestoreDb(), 'users', uid, 'progress', subjectId, 'state')
+  return doc(getFirestoreDb(), 'users', uid, 'progress', subjectId)
 }
 
 function notify(uid: string, subjectId: string) {

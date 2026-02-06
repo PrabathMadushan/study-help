@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import {
   getNoteIdsWithFlashcards,
@@ -9,154 +9,9 @@ import { getNoteById } from '../data/notes'
 import { flashcardData } from '../data/flashcards'
 import { useProgress } from '../hooks/useProgress'
 import { validateFlashcardAnswer } from '../lib/validateAnswer'
+import { useGeminiSpeechRecognition } from '../hooks/useGeminiSpeechRecognition'
 
 type ReviewLocationState = { noteIds?: string[]; startDeck?: 'all' } | null
-
-function useSpeechRecognition() {
-  const [listening, setListening] = useState(false)
-  const [supported, setSupported] = useState(false)
-  const [permissionState, setPermissionState] = useState<'prompt' | 'granted' | 'denied' | 'unknown'>('unknown')
-  const recognitionRef = useRef<SpeechRecognition | null>(null)
-  const finalTranscriptRef = useRef('')
-
-  useEffect(() => {
-    const SpeechRecognitionAPI =
-      window.SpeechRecognition || window.webkitSpeechRecognition
-    setSupported(!!SpeechRecognitionAPI)
-
-    // Check microphone permission status
-    if (navigator.permissions) {
-      navigator.permissions.query({ name: 'microphone' as PermissionName }).then((result) => {
-        setPermissionState(result.state as 'prompt' | 'granted' | 'denied')
-        result.onchange = () => {
-          setPermissionState(result.state as 'prompt' | 'granted' | 'denied')
-        }
-      }).catch(() => {
-        setPermissionState('unknown')
-      })
-    }
-
-    return () => {
-      if (recognitionRef.current) {
-        try {
-          recognitionRef.current.stop()
-        } catch (e) {
-          // Ignore errors on cleanup
-        }
-      }
-    }
-  }, [])
-
-  // Request microphone permission explicitly
-  const requestPermission = useCallback(async (): Promise<boolean> => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      stream.getTracks().forEach(track => track.stop())
-      setPermissionState('granted')
-      return true
-    } catch (error) {
-      console.error('Microphone permission denied:', error)
-      setPermissionState('denied')
-      return false
-    }
-  }, [])
-
-  const startListening = useCallback(
-    async (onResult: (transcript: string) => void) => {
-      // If permission not granted, request it first
-      if (permissionState !== 'granted' && permissionState !== 'unknown') {
-        const granted = await requestPermission()
-        if (!granted) return
-      }
-
-      const SpeechRecognitionAPI =
-        window.SpeechRecognition || window.webkitSpeechRecognition
-      if (!SpeechRecognitionAPI) return
-
-      // Stop any existing recognition
-      if (recognitionRef.current) {
-        try {
-          recognitionRef.current.stop()
-        } catch (e) {
-          // Ignore
-        }
-      }
-
-      // Create a fresh instance each time for mobile reliability
-      const recognition = new SpeechRecognitionAPI()
-      recognition.continuous = true
-      recognition.interimResults = true
-      recognition.lang = 'en-US'
-      
-      // Reset final transcript
-      finalTranscriptRef.current = ''
-
-      // Set up handlers BEFORE starting
-      recognition.onresult = (event: SpeechRecognitionEvent) => {
-        console.log('Speech recognition result received')
-        let interimTranscript = ''
-        let finalTranscript = ''
-
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-          const transcript = event.results[i][0].transcript
-          if (event.results[i].isFinal) {
-            finalTranscript += transcript + ' '
-          } else {
-            interimTranscript += transcript
-          }
-        }
-
-        if (finalTranscript) {
-          finalTranscriptRef.current += finalTranscript
-        }
-
-        // Send the combined text (final + interim)
-        const combined = finalTranscriptRef.current + interimTranscript
-        if (combined.trim()) {
-          onResult(combined.trim())
-        }
-      }
-
-      recognition.onerror = () => {
-        console.error('Speech recognition error')
-        setListening(false)
-      }
-
-      recognition.onend = () => {
-        console.log('Speech recognition ended')
-        setListening(false)
-      }
-
-      recognitionRef.current = recognition
-
-      // Start recognition
-      try {
-        recognition.start()
-        console.log('Speech recognition started')
-        setListening(true)
-      } catch (error) {
-        console.error('Failed to start speech recognition:', error)
-        setListening(false)
-      }
-    },
-    [permissionState, requestPermission]
-  )
-
-  const stopListening = useCallback(() => {
-    if (recognitionRef.current) {
-      try {
-        recognitionRef.current.stop()
-      } catch (error) {
-        console.error('Error stopping recognition:', error)
-      }
-      recognitionRef.current = null
-    }
-    finalTranscriptRef.current = ''
-    setListening(false)
-  }, [])
-
-  return { startListening, stopListening, listening, supported, permissionState, requestPermission }
-}
 
 function useSpeechSynthesis() {
   const speak = useCallback((text: string) => {
@@ -213,7 +68,7 @@ export function ReviewPage() {
   const [scoreResult, setScoreResult] = useState<{ score: number; feedback?: string } | null>(null)
   const [validating, setValidating] = useState(false)
   const { setNoteScore } = useProgress()
-  const { startListening, stopListening, listening, supported: speechRecognitionSupported, permissionState: micPermission } = useSpeechRecognition()
+  const { startListening, stopListening, listening, supported: speechRecognitionSupported, permissionState: micPermission, usingGemini } = useGeminiSpeechRecognition()
   const { speak, supported: ttsSupported } = useSpeechSynthesis()
 
   const allNoteIds = getNoteIdsWithFlashcards()
@@ -410,41 +265,50 @@ export function ReviewPage() {
             <textarea
               value={userAnswer}
               onChange={(e) => setUserAnswer(e.target.value)}
-              placeholder="Type or speak your answer..."
-              className="input min-h-[150px] pr-14 resize-none"
+              placeholder={usingGemini ? "Type or speak your answer (powered by Gemini AI)..." : "Type or speak your answer..."}
+              className={`input min-h-[150px] resize-none ${speechRecognitionSupported ? 'pr-32' : ''}`}
               disabled={validating}
             />
             {speechRecognitionSupported && (
-              <button
-                type="button"
-                onClick={() => (listening ? stopListening() : startListening(handleMicResult))}
-                disabled={micPermission === 'denied'}
-                className={`absolute right-3 top-3 p-2 rounded-lg transition-all ${
-                  micPermission === 'denied'
-                    ? 'bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-600 cursor-not-allowed'
-                    : listening
-                      ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 animate-pulse'
-                      : 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
-                }`}
-                title={
-                  micPermission === 'denied'
-                    ? 'Microphone access denied. Please enable it in browser settings.'
-                    : listening
-                      ? 'Stop listening'
-                      : 'Start voice input'
-                }
-              >
-                {micPermission === 'denied' ? (
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />
-                  </svg>
-                ) : (
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-                  </svg>
+              <div className="absolute right-3 top-3 flex items-center gap-2">
+                {usingGemini && (
+                  <span className="text-xs px-2 py-1 rounded-md bg-violet-100 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400 font-medium">
+                    Gemini AI
+                  </span>
                 )}
-              </button>
+                <button
+                  type="button"
+                  onClick={() => (listening ? stopListening() : startListening(handleMicResult))}
+                  disabled={micPermission === 'denied'}
+                  className={`p-2 rounded-lg transition-all ${
+                    micPermission === 'denied'
+                      ? 'bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-600 cursor-not-allowed'
+                      : listening
+                        ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 animate-pulse'
+                        : 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
+                  }`}
+                  title={
+                    micPermission === 'denied'
+                      ? 'Microphone access denied. Please enable it in browser settings.'
+                      : listening
+                        ? 'Stop listening'
+                        : usingGemini 
+                          ? 'Start voice input (Gemini AI)'
+                          : 'Start voice input'
+                  }
+                >
+                  {micPermission === 'denied' ? (
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />
+                    </svg>
+                  ) : (
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                    </svg>
+                  )}
+                </button>
+              </div>
             )}
           </div>
           <button
