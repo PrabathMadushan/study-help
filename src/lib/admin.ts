@@ -3,161 +3,385 @@ import {
   doc, 
   setDoc, 
   updateDoc, 
-  deleteDoc, 
+  deleteDoc,
+  getDoc,
+  getDocs,
+  query,
+  where,
+  orderBy,
+  writeBatch,
   serverTimestamp
 } from 'firebase/firestore'
 import { getFirestoreDb } from './firebase'
-import type { Subject, Category, Subcategory, SubSubcategory, Note } from '../types/firestore'
+import type { Category, Note } from '../types/firestore'
 
-// Subject CRUD
-export async function createSubject(data: Omit<Subject, 'id' | 'createdAt' | 'updatedAt'>) {
+/**
+ * Create a new category with automatic depth and path computation
+ */
+export async function createCategory(data: Omit<Category, 'id' | 'createdAt' | 'updatedAt' | 'depth' | 'path'>): Promise<string> {
   const db = getFirestoreDb()
-  const docRef = doc(collection(db, 'subjects'))
+  const docRef = doc(collection(db, 'categories'))
   
-  console.log('[createSubject] Creating subject with data:', data)
+  console.log('[createCategory] Creating category with data:', data)
   
   try {
-    await setDoc(docRef, {
-      ...data,
+    // Compute depth and path
+    let depth = 0
+    let path: string[] = []
+    
+    if (data.parentId) {
+      const parentDoc = await getDoc(doc(db, 'categories', data.parentId))
+      if (parentDoc.exists()) {
+        const parentData = parentDoc.data() as Category
+        depth = parentData.depth + 1
+        path = [...parentData.path, parentDoc.id]  // Use parentDoc.id, not parentData.id!
+        
+        console.log('[createCategory] Parent found, depth:', depth, 'path:', path)
+      } else {
+        throw new Error(`Parent category ${data.parentId} not found`)
+      }
+    }
+    
+    // Clean data - remove undefined values and empty strings
+    const cleanData: any = {
+      parentId: data.parentId || null,
+      name: data.name,
+      isLeaf: data.isLeaf,
+      order: data.order,
+      depth,
+      path,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
-    })
+    }
     
-    console.log('[createSubject] Subject created successfully with ID:', docRef.id)
+    // Only add optional fields if they have non-empty values
+    if (data.description && data.description.trim()) {
+      cleanData.description = data.description.trim()
+    }
+    if (data.icon && data.icon.trim()) {
+      cleanData.icon = data.icon.trim()
+    }
+    if (data.color && data.color.trim()) {
+      cleanData.color = data.color.trim()
+    }
+   
+    console.log(docRef.id,cleanData)
+    await setDoc(docRef, cleanData)
+    
+    console.log('[createCategory] Category created successfully with ID:', docRef.id)
     return docRef.id
   } catch (error) {
-    console.error('[createSubject] Error creating subject:', error)
+    console.error('[createCategory] Error creating category:', error)
     throw error
   }
 }
 
-export async function updateSubject(id: string, data: Partial<Omit<Subject, 'id' | 'createdAt' | 'updatedAt'>>) {
-  const db = getFirestoreDb()
-  const docRef = doc(db, 'subjects', id)
-  
-  await updateDoc(docRef, {
-    ...data,
-    updatedAt: serverTimestamp(),
-  })
-}
-
-export async function deleteSubject(id: string) {
-  const db = getFirestoreDb()
-  await deleteDoc(doc(db, 'subjects', id))
-}
-
-// Category CRUD
-export async function createCategory(data: Omit<Category, 'id' | 'createdAt' | 'updatedAt'>) {
-  const db = getFirestoreDb()
-  const docRef = doc(collection(db, 'categories'))
-  
-  await setDoc(docRef, {
-    ...data,
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-  })
-  
-  return docRef.id
-}
-
-export async function updateCategory(id: string, data: Partial<Omit<Category, 'id' | 'createdAt' | 'updatedAt'>>) {
+/**
+ * Update a category (recomputes depth/path if parentId changes)
+ */
+export async function updateCategory(id: string, data: Partial<Omit<Category, 'id' | 'createdAt' | 'updatedAt' | 'depth' | 'path'>>): Promise<void> {
   const db = getFirestoreDb()
   const docRef = doc(db, 'categories', id)
   
-  await updateDoc(docRef, {
-    ...data,
-    updatedAt: serverTimestamp(),
-  })
-}
-
-export async function deleteCategory(id: string) {
-  const db = getFirestoreDb()
-  await deleteDoc(doc(db, 'categories', id))
-}
-
-// Subcategory CRUD
-export async function createSubcategory(data: Omit<Subcategory, 'id' | 'createdAt' | 'updatedAt'>) {
-  const db = getFirestoreDb()
-  const docRef = doc(collection(db, 'subcategories'))
+  console.log('[updateCategory] Updating category:', id, 'with data:', data)
   
-  await setDoc(docRef, {
-    ...data,
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-  })
-  
-  return docRef.id
+  try {
+    // Clean data - remove undefined values and empty strings
+    const cleanData: any = {
+      updatedAt: serverTimestamp(),
+    }
+    
+    // Only add fields that have actual non-empty values
+    if (data.name !== undefined) cleanData.name = data.name
+    if (data.isLeaf !== undefined) cleanData.isLeaf = data.isLeaf
+    if (data.order !== undefined) cleanData.order = data.order
+    if (data.description !== undefined && data.description && data.description.trim()) {
+      cleanData.description = data.description.trim()
+    }
+    if (data.icon !== undefined && data.icon && data.icon.trim()) {
+      cleanData.icon = data.icon.trim()
+    }
+    if (data.color !== undefined && data.color && data.color.trim()) {
+      cleanData.color = data.color.trim()
+    }
+    
+    // If parentId is changing, recompute depth and path
+    if (data.parentId !== undefined) {
+      let depth = 0
+      let path: string[] = []
+      
+      if (data.parentId) {
+        const parentDoc = await getDoc(doc(db, 'categories', data.parentId))
+        if (parentDoc.exists()) {
+          const parentData = parentDoc.data() as Category
+          depth = parentData.depth + 1
+          path = [...parentData.path, parentDoc.id]  // Use parentDoc.id, not parentData.id!
+        } else {
+          throw new Error(`Parent category ${data.parentId} not found`)
+        }
+      }
+      
+      cleanData.parentId = data.parentId || null
+      cleanData.depth = depth
+      cleanData.path = path
+      
+      console.log('[updateCategory] Parent changed, updated depth and path')
+    }
+    
+    await updateDoc(docRef, cleanData)
+    
+    console.log('[updateCategory] Category updated successfully')
+  } catch (error) {
+    console.error('[updateCategory] Error updating category:', error)
+    throw error
+  }
 }
 
-export async function updateSubcategory(id: string, data: Partial<Omit<Subcategory, 'id' | 'createdAt' | 'updatedAt'>>) {
+/**
+ * Delete a category (with option to cascade delete children)
+ */
+export async function deleteCategory(id: string, cascade: boolean = false): Promise<void> {
   const db = getFirestoreDb()
-  const docRef = doc(db, 'subcategories', id)
   
-  await updateDoc(docRef, {
-    ...data,
-    updatedAt: serverTimestamp(),
-  })
-}
-
-export async function deleteSubcategory(id: string) {
-  const db = getFirestoreDb()
-  await deleteDoc(doc(db, 'subcategories', id))
-}
-
-// SubSubcategory CRUD
-export async function createSubSubcategory(data: Omit<SubSubcategory, 'id' | 'createdAt' | 'updatedAt'>) {
-  const db = getFirestoreDb()
-  const docRef = doc(collection(db, 'subSubcategories'))
+  console.log('[deleteCategory] Deleting category:', id, 'cascade:', cascade)
   
-  await setDoc(docRef, {
-    ...data,
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-  })
-  
-  return docRef.id
+  try {
+    if (cascade) {
+      // Get all descendants
+      const descendants = await getCategoryDescendants(id)
+      
+      // Batch delete
+      const batch = writeBatch(db)
+      batch.delete(doc(db, 'categories', id))
+      
+      descendants.forEach(descendant => {
+        batch.delete(doc(db, 'categories', descendant.id))
+      })
+      
+      await batch.commit()
+      console.log('[deleteCategory] Deleted category and', descendants.length, 'descendants')
+    } else {
+      // Check if has children
+      const children = await getCategoryChildren(id)
+      if (children.length > 0) {
+        throw new Error(`Cannot delete category with ${children.length} children. Use cascade=true to delete all descendants.`)
+      }
+      
+      await deleteDoc(doc(db, 'categories', id))
+      console.log('[deleteCategory] Category deleted')
+    }
+  } catch (error) {
+    console.error('[deleteCategory] Error deleting category:', error)
+    throw error
+  }
 }
 
-export async function updateSubSubcategory(id: string, data: Partial<Omit<SubSubcategory, 'id' | 'createdAt' | 'updatedAt'>>) {
+/**
+ * Get direct children of a category
+ */
+export async function getCategoryChildren(parentId: string | null): Promise<Category[]> {
   const db = getFirestoreDb()
-  const docRef = doc(db, 'subSubcategories', id)
   
-  await updateDoc(docRef, {
-    ...data,
-    updatedAt: serverTimestamp(),
-  })
+  const q = query(
+    collection(db, 'categories'),
+    where('parentId', '==', parentId),
+    orderBy('order', 'asc')
+  )
+  
+  const snapshot = await getDocs(q)
+  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Category))
 }
 
-export async function deleteSubSubcategory(id: string) {
+/**
+ * Get all descendants of a category (recursive)
+ */
+export async function getCategoryDescendants(categoryId: string): Promise<Category[]> {
+  const children = await getCategoryChildren(categoryId)
+  const descendants: Category[] = [...children]
+  
+  for (const child of children) {
+    const childDescendants = await getCategoryDescendants(child.id)
+    descendants.push(...childDescendants)
+  }
+  
+  return descendants
+}
+
+/**
+ * Get ancestors of a category (path to root)
+ */
+export async function getCategoryAncestors(categoryId: string): Promise<Category[]> {
   const db = getFirestoreDb()
-  await deleteDoc(doc(db, 'subSubcategories', id))
+  
+  const categoryDoc = await getDoc(doc(db, 'categories', categoryId))
+  if (!categoryDoc.exists()) {
+    return []
+  }
+  
+  const category = categoryDoc.data() as Category
+  if (!category.path || category.path.length === 0) {
+    return []
+  }
+  
+  const ancestors: Category[] = []
+  for (const ancestorId of category.path) {
+    const ancestorDoc = await getDoc(doc(db, 'categories', ancestorId))
+    if (ancestorDoc.exists()) {
+      ancestors.push({ id: ancestorDoc.id, ...ancestorDoc.data() } as Category)
+    }
+  }
+  
+  return ancestors
 }
 
-// Note CRUD
-export async function createNote(data: Omit<Note, 'id' | 'createdAt' | 'updatedAt'>) {
+/**
+ * Check if a category can be safely deleted
+ */
+export async function canDeleteCategory(categoryId: string): Promise<{ canDelete: boolean; reason?: string }> {
+  const children = await getCategoryChildren(categoryId)
+  
+  if (children.length > 0) {
+    return {
+      canDelete: false,
+      reason: `Category has ${children.length} child categories`
+    }
+  }
+  
+  // Check for notes
+  const db = getFirestoreDb()
+  const notesQuery = query(
+    collection(db, 'notes'),
+    where('categoryId', '==', categoryId)
+  )
+  const notesSnapshot = await getDocs(notesQuery)
+  
+  if (!notesSnapshot.empty) {
+    return {
+      canDelete: false,
+      reason: `Category has ${notesSnapshot.size} notes`
+    }
+  }
+  
+  return { canDelete: true }
+}
+
+/**
+ * Get a single category by ID
+ */
+export async function getCategoryById(categoryId: string): Promise<Category | null> {
+  const db = getFirestoreDb()
+  const docSnap = await getDoc(doc(db, 'categories', categoryId))
+  
+  if (!docSnap.exists()) {
+    return null
+  }
+  
+  return { id: docSnap.id, ...docSnap.data() } as Category
+}
+
+/**
+ * Create a note
+ */
+export async function createNote(data: Omit<Note, 'id' | 'createdAt' | 'updatedAt' | 'path'>): Promise<string> {
   const db = getFirestoreDb()
   const docRef = doc(collection(db, 'notes'))
   
-  await setDoc(docRef, {
-    ...data,
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-  })
+  console.log('[createNote] Creating note with data:', data)
   
-  return docRef.id
+  try {
+    // Get category to compute path
+    const categoryDoc = await getDoc(doc(db, 'categories', data.categoryId))
+    if (!categoryDoc.exists()) {
+      throw new Error(`Category ${data.categoryId} not found`)
+    }
+    
+    const category = categoryDoc.data() as Category
+    if (!category.isLeaf) {
+      throw new Error(`Category ${data.categoryId} is not a leaf category (isLeaf=false)`)
+    }
+    
+    const path = [...category.path, categoryDoc.id]  // Use categoryDoc.id!
+    
+    // Clean data - remove undefined values
+    const cleanData: any = {
+      categoryId: data.categoryId,
+      path,
+      title: data.title,
+      content: data.content,
+      order: data.order,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    }
+    
+    // Only add interviewAnswer if it has a value
+    if (data.interviewAnswer) {
+      cleanData.interviewAnswer = data.interviewAnswer
+    }
+    
+    await setDoc(docRef, cleanData)
+    
+    console.log('[createNote] Note created successfully with ID:', docRef.id)
+    return docRef.id
+  } catch (error) {
+    console.error('[createNote] Error creating note:', error)
+    throw error
+  }
 }
 
-export async function updateNote(id: string, data: Partial<Omit<Note, 'id' | 'createdAt' | 'updatedAt'>>) {
+/**
+ * Update a note
+ */
+export async function updateNote(id: string, data: Partial<Omit<Note, 'id' | 'createdAt' | 'updatedAt' | 'path'>>): Promise<void> {
   const db = getFirestoreDb()
   const docRef = doc(db, 'notes', id)
   
-  await updateDoc(docRef, {
-    ...data,
-    updatedAt: serverTimestamp(),
-  })
+  console.log('[updateNote] Updating note:', id, 'with data:', data)
+  
+  try {
+    // Clean data - remove undefined values
+    const cleanData: any = {
+      updatedAt: serverTimestamp(),
+    }
+    
+    // Only add fields that have actual values
+    if (data.title !== undefined) cleanData.title = data.title
+    if (data.content !== undefined) cleanData.content = data.content
+    if (data.order !== undefined) cleanData.order = data.order
+    if (data.interviewAnswer !== undefined) {
+      cleanData.interviewAnswer = data.interviewAnswer || null
+    }
+    
+    // If categoryId is changing, recompute path
+    if (data.categoryId) {
+      const categoryDoc = await getDoc(doc(db, 'categories', data.categoryId))
+      if (!categoryDoc.exists()) {
+        throw new Error(`Category ${data.categoryId} not found`)
+      }
+      
+      const category = categoryDoc.data() as Category
+      if (!category.isLeaf) {
+        throw new Error(`Category ${data.categoryId} is not a leaf category`)
+      }
+      
+      const path = [...category.path, categoryDoc.id]  // Use categoryDoc.id!
+      
+      cleanData.categoryId = data.categoryId
+      cleanData.path = path
+    }
+    
+    await updateDoc(docRef, cleanData)
+    
+    console.log('[updateNote] Note updated successfully')
+  } catch (error) {
+    console.error('[updateNote] Error updating note:', error)
+    throw error
+  }
 }
 
-export async function deleteNote(id: string) {
+/**
+ * Delete a note
+ */
+export async function deleteNote(id: string): Promise<void> {
   const db = getFirestoreDb()
   await deleteDoc(doc(db, 'notes', id))
 }

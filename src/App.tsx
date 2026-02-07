@@ -1,21 +1,19 @@
 import { createBrowserRouter, RouterProvider } from 'react-router-dom'
 import { AuthProvider } from './contexts/AuthContext'
 import { ThemeProvider } from './contexts/ThemeContext'
-import { SubjectProvider } from './contexts/SubjectContext'
 import { Layout } from './components/Layout'
 import { AdminLayout } from './components/AdminLayout'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import { HomePage } from './pages/HomePage'
-import { SubjectsPage } from './pages/SubjectsPage'
-import { CategoryPage } from './pages/CategoryPage'
+import { GraphPage } from './pages/GraphPage'
 import { NotePage } from './pages/NotePage'
 import { LoginPage } from './pages/LoginPage'
 import { SignUpPage } from './pages/SignUpPage'
 import { ReviewPage } from './pages/ReviewPage'
 import { DashboardPage } from './pages/DashboardPage'
-import { SubjectsManage } from './pages/admin/SubjectsManage'
-import { CategoriesManage } from './pages/admin/CategoriesManage'
+import { CategoriesTreeManage } from './pages/admin/CategoriesTreeManage'
 import { NotesManage } from './pages/admin/NotesManage'
+import { ValidationTools } from './pages/admin/ValidationTools'
 
 const router = createBrowserRouter([
   {
@@ -35,12 +33,10 @@ const router = createBrowserRouter([
     ),
     children: [
       { index: true, element: <HomePage /> },
-      { path: 'subjects', element: <SubjectsPage /> },
+      { path: 'graph', element: <GraphPage /> },
+      { path: 'graph/:categoryId', element: <GraphPage /> },
       { path: 'review', element: <ReviewPage /> },
       { path: 'dashboard', element: <DashboardPage /> },
-      { path: 'category/:id', element: <CategoryPage /> },
-      { path: 'category/:id/:subId', element: <CategoryPage /> },
-      { path: 'category/:id/:subId/:subSubId', element: <CategoryPage /> },
       { path: 'note/:id', element: <NotePage /> },
     ],
   },
@@ -52,9 +48,9 @@ const router = createBrowserRouter([
       </ProtectedRoute>
     ),
     children: [
-      { path: 'subjects', element: <SubjectsManage /> },
-      { path: 'categories', element: <CategoriesManage /> },
+      { path: 'categories', element: <CategoriesTreeManage /> },
       { path: 'notes', element: <NotesManage /> },
+      { path: 'validation', element: <ValidationTools /> },
     ],
   },
 ])
@@ -63,9 +59,7 @@ function App() {
   return (
     <ThemeProvider>
       <AuthProvider>
-        <SubjectProvider>
-          <RouterProvider router={router} />
-        </SubjectProvider>
+        <RouterProvider router={router} />
       </AuthProvider>
     </ThemeProvider>
   )

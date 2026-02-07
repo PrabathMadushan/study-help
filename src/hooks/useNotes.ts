@@ -3,24 +3,27 @@ import { collection, query, where, orderBy, onSnapshot, doc } from 'firebase/fir
 import { getFirestoreDb } from '../lib/firebase'
 import type { Note } from '../types/firestore'
 
-export function useNotes(parentId?: string | null, parentType?: 'category' | 'subcategory' | 'subSubcategory') {
+/**
+ * Hook to get notes by categoryId
+ */
+export function useNotes(categoryId: string | null) {
   const [notes, setNotes] = useState<Note[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<Error | null>(null)
 
   useEffect(() => {
-    if (!parentId || !parentType) {
+    if (!categoryId) {
       setNotes([])
       setLoading(false)
       return
     }
 
-    const fieldName = parentType === 'category' ? 'categoryId' 
-      : parentType === 'subcategory' ? 'subcategoryId' 
-      : 'subSubcategoryId'
+    setLoading(true)
+    setError(null)
 
     const q = query(
       collection(getFirestoreDb(), 'notes'),
-      where(fieldName, '==', parentId),
+      where('categoryId', '==', categoryId),
       orderBy('order', 'asc')
     )
 
@@ -37,22 +40,27 @@ export function useNotes(parentId?: string | null, parentType?: 'category' | 'su
         setNotes(data)
         setLoading(false)
       },
-      (error) => {
-        console.error('Error fetching notes:', error)
+      (err) => {
+        console.error('[useNotes] Error fetching notes:', err)
+        setError(err as Error)
         setNotes([])
         setLoading(false)
       }
     )
 
     return unsubscribe
-  }, [parentId, parentType])
+  }, [categoryId])
 
-  return { notes, loading }
+  return { notes, loading, error }
 }
 
-export function useNote(noteId?: string | null) {
+/**
+ * Hook to get a single note by ID
+ */
+export function useNote(noteId: string | null) {
   const [note, setNote] = useState<Note | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<Error | null>(null)
 
   useEffect(() => {
     if (!noteId) {
@@ -60,6 +68,9 @@ export function useNote(noteId?: string | null) {
       setLoading(false)
       return
     }
+
+    setLoading(true)
+    setError(null)
 
     const unsubscribe = onSnapshot(
       doc(getFirestoreDb(), 'notes', noteId),
@@ -77,8 +88,9 @@ export function useNote(noteId?: string | null) {
         }
         setLoading(false)
       },
-      (error) => {
-        console.error('Error fetching note:', error)
+      (err) => {
+        console.error('[useNote] Error fetching note:', err)
+        setError(err as Error)
         setNote(null)
         setLoading(false)
       }
@@ -87,5 +99,5 @@ export function useNote(noteId?: string | null) {
     return unsubscribe
   }, [noteId])
 
-  return { note, loading }
+  return { note, loading, error }
 }

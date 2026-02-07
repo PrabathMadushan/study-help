@@ -71,55 +71,22 @@ service cloud.firestore {
     }
     
     // ============================================
-    // SUBJECTS (Super Categories)
-    // Path: /subjects/{subjectId}
-    // ============================================
-    match /subjects/{subjectId} {
-      // All authenticated users can read subjects
-      allow read: if request.auth != null;
-      
-      // Only admins can create, update, delete subjects
-      allow create, update: if isAdmin() && isValidSubject();
-      allow delete: if isAdmin();
-    }
-    
-    // ============================================
-    // CATEGORIES
+    // CATEGORIES (V2 - Unified Tree Structure)
     // Path: /categories/{categoryId}
     // ============================================
     match /categories/{categoryId} {
       allow read: if request.auth != null;
-      allow create, update: if isAdmin() && isValidCategory();
+      allow create, update: if isAdmin() && isValidCategoryV2();
       allow delete: if isAdmin();
     }
     
     // ============================================
-    // SUBCATEGORIES
-    // Path: /subcategories/{subcategoryId}
-    // ============================================
-    match /subcategories/{subcategoryId} {
-      allow read: if request.auth != null;
-      allow create, update: if isAdmin() && isValidSubcategory();
-      allow delete: if isAdmin();
-    }
-    
-    // ============================================
-    // SUB-SUBCATEGORIES
-    // Path: /subSubcategories/{subSubcategoryId}
-    // ============================================
-    match /subSubcategories/{subSubcategoryId} {
-      allow read: if request.auth != null;
-      allow create, update: if isAdmin() && isValidSubSubcategory();
-      allow delete: if isAdmin();
-    }
-    
-    // ============================================
-    // NOTES
+    // NOTES (V2 - Single categoryId reference)
     // Path: /notes/{noteId}
     // ============================================
     match /notes/{noteId} {
       allow read: if request.auth != null;
-      allow create, update: if isAdmin() && isValidNote();
+      allow create, update: if isAdmin() && isValidNoteV2();
       allow delete: if isAdmin();
     }
     
@@ -173,63 +140,37 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.role == 'admin';
     }
     
-    // Validate subject document
-    function isValidSubject() {
+    // ============================================
+    // V2 UNIFIED CATEGORY SYSTEM VALIDATION
+    // ============================================
+    
+    // Validate V2 category document (unified tree structure)
+    function isValidCategoryV2() {
       let data = request.resource.data;
-      return data.keys().hasOnly(['name', 'description', 'icon', 'color', 'order', 'createdAt', 'updatedAt'])
-        && data.name is string && data.name.size() <= 200
-        && data.order is number
+      return data.keys().hasOnly(['parentId', 'name', 'description', 'icon', 'color', 'isLeaf', 'order', 'depth', 'path', 'createdAt', 'updatedAt'])
+        && 'name' in data && data.name is string && data.name.size() > 0 && data.name.size() <= 200
+        && 'isLeaf' in data && data.isLeaf is bool
+        && 'order' in data && data.order is number
+        && 'depth' in data && data.depth is number && data.depth >= 0 && data.depth <= 50
+        && 'path' in data && data.path is list && data.path.size() <= 50
         && (!('description' in data) || (data.description is string && data.description.size() <= 1000))
         && (!('icon' in data) || (data.icon is string && data.icon.size() <= 100))
-        && (!('color' in data) || (data.color is string && data.color.size() <= 50));
+        && (!('color' in data) || (data.color is string && data.color.size() <= 50))
+        && (!('parentId' in data) || data.parentId is string || data.parentId == null)
+        && ((data.parentId == null && data.depth == 0 && data.path.size() == 0) || (data.parentId != null && data.depth == data.path.size()));
     }
     
-    // Validate category document
-    function isValidCategory() {
+    // Validate V2 note document (single categoryId reference)
+    function isValidNoteV2() {
       let data = request.resource.data;
-      return data.keys().hasOnly(['subjectId', 'name', 'description', 'icon', 'order', 'createdAt', 'updatedAt'])
-        && data.subjectId is string && data.subjectId.size() <= 100
-        && data.name is string && data.name.size() <= 200
-        && data.order is number
-        && (!('description' in data) || (data.description is string && data.description.size() <= 1000))
-        && (!('icon' in data) || (data.icon is string && data.icon.size() <= 100));
-    }
-    
-    // Validate subcategory document
-    function isValidSubcategory() {
-      let data = request.resource.data;
-      return data.keys().hasOnly(['subjectId', 'categoryId', 'name', 'description', 'order', 'createdAt', 'updatedAt'])
-        && data.subjectId is string && data.subjectId.size() <= 100
-        && data.categoryId is string && data.categoryId.size() <= 100
-        && data.name is string && data.name.size() <= 200
-        && data.order is number
-        && (!('description' in data) || (data.description is string && data.description.size() <= 1000));
-    }
-    
-    // Validate sub-subcategory document
-    function isValidSubSubcategory() {
-      let data = request.resource.data;
-      return data.keys().hasOnly(['subjectId', 'categoryId', 'subcategoryId', 'name', 'description', 'order', 'createdAt', 'updatedAt'])
-        && data.subjectId is string && data.subjectId.size() <= 100
-        && data.categoryId is string && data.categoryId.size() <= 100
-        && data.subcategoryId is string && data.subcategoryId.size() <= 100
-        && data.name is string && data.name.size() <= 200
-        && data.order is number
-        && (!('description' in data) || (data.description is string && data.description.size() <= 1000));
-    }
-    
-    // Validate note document
-    function isValidNote() {
-      let data = request.resource.data;
-      return data.keys().hasOnly(['subjectId', 'categoryId', 'subcategoryId', 'subSubcategoryId', 'title', 'content', 'interviewAnswer', 'order', 'createdAt', 'updatedAt'])
-        && data.subjectId is string && data.subjectId.size() <= 100
-        && data.categoryId is string && data.categoryId.size() <= 100
-        && data.title is string && data.title.size() <= 500
+      return data.keys().hasOnly(['categoryId', 'path', 'title', 'content', 'interviewAnswer', 'order', 'createdAt', 'updatedAt'])
+        && data.categoryId is string && data.categoryId.size() > 0 && data.categoryId.size() <= 100
+        && data.path is list && data.path.size() >= 1 && data.path.size() <= 50
+        && data.title is string && data.title.size() > 0 && data.title.size() <= 500
         && data.content is string && data.content.size() <= 100000
         && data.order is number
-        && (!('subcategoryId' in data) || (data.subcategoryId is string && data.subcategoryId.size() <= 100))
-        && (!('subSubcategoryId' in data) || (data.subSubcategoryId is string && data.subSubcategoryId.size() <= 100))
-        && (!('interviewAnswer' in data) || (data.interviewAnswer is string && data.interviewAnswer.size() <= 5000));
+        && (!('interviewAnswer' in data) || (data.interviewAnswer is string && data.interviewAnswer.size() <= 5000))
+        && data.path[data.path.size() - 1] == data.categoryId;
     }
   }
 }

@@ -2,15 +2,11 @@ import { Outlet, Link, NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAdmin } from '../hooks/useAdmin'
-import { useSubject } from '../contexts/SubjectContext'
-import { useSubjects } from '../hooks/useSubjects'
 
 export function Layout() {
   const { user, loading, signOut } = useAuth()
   const { resolvedTheme, toggleTheme } = useTheme()
   const { isAdmin } = useAdmin()
-  const { currentSubjectId, setCurrentSubjectId } = useSubject()
-  const { subjects } = useSubjects()
   const navigate = useNavigate()
 
   async function handleSignOut() {
@@ -48,29 +44,6 @@ export function Layout() {
               </Link>
 
               <div className="flex items-center gap-0.5 sm:gap-1">
-                {/* Subject selector */}
-                {subjects.length > 0 && (
-                  <select
-                    value={currentSubjectId || ''}
-                    onChange={(e) => {
-                      if (e.target.value) {
-                        setCurrentSubjectId(e.target.value)
-                        navigate('/')
-                      } else {
-                        navigate('/subjects')
-                      }
-                    }}
-                    className="px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm font-medium rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 border border-gray-300 dark:border-gray-600 hover:border-violet-500 dark:hover:border-violet-400 transition-colors max-w-[120px] sm:max-w-[150px]"
-                  >
-                    <option value="">Select Subject</option>
-                    {subjects.map((subject) => (
-                      <option key={subject.id} value={subject.id}>
-                        {subject.icon} {subject.name}
-                      </option>
-                    ))}
-                  </select>
-                )}
-
                 <NavLink
                   to="/"
                   end
@@ -83,6 +56,19 @@ export function Layout() {
                   }
                 >
                   Home
+                </NavLink>
+                <NavLink
+                  to="/graph"
+                  className={({ isActive }) =>
+                    `inline-flex items-center justify-center px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm font-medium rounded-lg transition-colors whitespace-nowrap ${
+                      isActive
+                        ? 'text-violet-700 dark:text-violet-300 bg-violet-100/80 dark:bg-violet-900/30'
+                        : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100/80 dark:hover:bg-gray-800/80'
+                    }`
+                  }
+                >
+                  <span className="sm:hidden">Graph</span>
+                  <span className="hidden sm:inline">Graph View</span>
                 </NavLink>
                 <NavLink
                   to="/dashboard"
@@ -135,7 +121,7 @@ export function Layout() {
               {/* Admin panel link */}
               {isAdmin && (
                 <Link
-                  to="/admin/subjects"
+                  to="/admin/categories"
                   className="p-2 rounded-lg text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100/80 dark:hover:bg-gray-800/80 transition-colors"
                   title="Admin Panel"
                 >

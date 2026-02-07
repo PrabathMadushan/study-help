@@ -1,32 +1,13 @@
-import { Link, Navigate } from 'react-router-dom'
-import { useSubject } from '../contexts/SubjectContext'
+import { Link } from 'react-router-dom'
 import { useCategories } from '../hooks/useCategories'
-import { useSubjects } from '../hooks/useSubjects'
-import { CategoryCard } from '../components/CategoryCard'
-import { getNoteIdsWithFlashcards } from '../data/flashcards'
-import { useProgress } from '../hooks/useProgress'
 import { LoadingScreen } from '../components/LoadingScreen'
 
 export function HomePage() {
-  const { currentSubjectId } = useSubject()
-  const { subjects } = useSubjects()
-  const { categories, loading: categoriesLoading } = useCategories(currentSubjectId)
-  const hasFlashcards = getNoteIdsWithFlashcards().length > 0
-  const flashcardCount = getNoteIdsWithFlashcards().length
-  const { getOverallProgress } = useProgress()
-  const overallProgress = getOverallProgress()
+  const { categories: rootCategories, loading } = useCategories(null)
 
-  // Redirect to subjects page if no subject is selected and subjects exist
-  if (!currentSubjectId && subjects.length > 0) {
-    return <Navigate to="/subjects" replace />
-  }
-
-  // Show loading while fetching categories
-  if (categoriesLoading) {
+  if (loading) {
     return <LoadingScreen />
   }
-
-  const currentSubject = subjects.find((s) => s.id === currentSubjectId)
 
   return (
     <div className="space-y-6 sm:space-y-10">
@@ -35,41 +16,29 @@ export function HomePage() {
         <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iMC4xIj48Y2lyY2xlIGN4PSIzMCIgY3k9IjMwIiByPSIyIi8+PC9nPjwvZz48L3N2Zz4=')] opacity-50" />
         
         <div className="relative">
-          {/* Progress and Title Row */}
+          {/* Title Row */}
           <div className="flex items-start justify-between gap-4 mb-4">
             <div className="flex-1 min-w-0">
               <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold mb-2">
-                {currentSubject ? `${currentSubject.icon} ${currentSubject.name}` : 'Welcome back!'}
+                Welcome to Study Help
               </h1>
               <p className="text-violet-100 text-sm sm:text-base lg:text-lg max-w-xl">
-                {currentSubject ? currentSubject.description : 'Master your interview skills with structured study notes and AI-powered practice.'}
+                Explore categories and organize your learning journey with interactive graph navigation.
               </p>
-            </div>
-            
-            {/* Progress circle - smaller on mobile */}
-            <div className="shrink-0 bg-white/10 backdrop-blur-sm rounded-xl sm:rounded-2xl p-2 sm:p-4 border border-white/20">
-              <div className="w-14 h-14 sm:w-20 sm:h-20 lg:w-24 lg:h-24 rounded-full bg-white/20 flex flex-col items-center justify-center">
-                <span className="text-lg sm:text-2xl lg:text-3xl font-bold">{overallProgress}%</span>
-                <span className="text-[10px] sm:text-xs text-violet-200 hidden sm:block">Complete</span>
-              </div>
             </div>
           </div>
           
           {/* Action Buttons */}
           <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 mt-4 sm:mt-6">
-            {hasFlashcards && (
-              <Link
-                to="/review"
-                state={{ startDeck: 'all' as const }}
-                className="inline-flex items-center justify-center gap-2 px-4 sm:px-5 py-2.5 sm:py-3 rounded-xl bg-white text-violet-700 font-semibold hover:bg-violet-50 transition-all shadow-lg text-sm sm:text-base"
-              >
-                <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                Start Practice
-              </Link>
-            )}
+            <Link
+              to="/graph"
+              className="inline-flex items-center justify-center gap-2 px-4 sm:px-5 py-2.5 sm:py-3 rounded-xl bg-white text-violet-700 font-semibold hover:bg-violet-50 transition-all shadow-lg text-sm sm:text-base"
+            >
+              <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+              Explore Graph View
+            </Link>
             <Link
               to="/dashboard"
               className="inline-flex items-center justify-center gap-2 px-4 sm:px-5 py-2.5 sm:py-3 rounded-xl bg-white/20 backdrop-blur-sm text-white font-semibold hover:bg-white/30 transition-all border border-white/25 text-sm sm:text-base"
@@ -81,19 +50,11 @@ export function HomePage() {
             </Link>
           </div>
           
-          {/* Stats - horizontal scroll on mobile */}
+          {/* Stats */}
           <div className="flex gap-4 sm:gap-6 mt-5 sm:mt-8 pt-4 sm:pt-6 border-t border-white/20 overflow-x-auto">
             <div className="shrink-0">
-              <p className="text-xl sm:text-2xl font-bold">{categories.length}</p>
-              <p className="text-xs sm:text-sm text-violet-200">Categories</p>
-            </div>
-            <div className="shrink-0">
-              <p className="text-xl sm:text-2xl font-bold">{flashcardCount}</p>
-              <p className="text-xs sm:text-sm text-violet-200">Questions</p>
-            </div>
-            <div className="shrink-0">
-              <p className="text-xl sm:text-2xl font-bold">{overallProgress}%</p>
-              <p className="text-xs sm:text-sm text-violet-200">Mastery</p>
+              <p className="text-xl sm:text-2xl font-bold">{rootCategories.length}</p>
+              <p className="text-xs sm:text-sm text-violet-200">Root Categories</p>
             </div>
           </div>
         </div>
@@ -102,17 +63,73 @@ export function HomePage() {
       {/* Categories Section */}
       <section>
         <div className="mb-4 sm:mb-6">
-          <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">Study Categories</h2>
+          <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">Root Categories</h2>
           <p className="text-gray-500 dark:text-gray-400 mt-1 text-sm sm:text-base">
-            Choose a topic to explore and practice
+            Choose a category to explore in graph view
           </p>
         </div>
         
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-5">
-          {categories.map((category) => (
-            <CategoryCard key={category.id} category={category} />
-          ))}
-        </div>
+        {rootCategories.length === 0 ? (
+          <div className="text-center py-12 bg-white dark:bg-gray-800 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-700">
+            <svg
+              className="w-16 h-16 mx-auto text-gray-400 mb-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={1.5}
+                d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"
+              />
+            </svg>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
+              No categories yet
+            </h3>
+            <p className="text-gray-600 dark:text-gray-400 mb-4">
+              Get started by creating your first category in the admin panel.
+            </p>
+            <Link
+              to="/admin/categories"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              Create First Category
+            </Link>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-5">
+            {rootCategories.map((category) => (
+              <Link
+                key={category.id}
+                to={`/graph/${category.id}`}
+                className="group relative overflow-hidden rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 p-6 text-white shadow-lg hover:shadow-xl transition-all hover:scale-105"
+              >
+                <div className="relative z-10">
+                  {category.icon && (
+                    <div className="text-4xl mb-3">{category.icon}</div>
+                  )}
+                  <h3 className="text-lg font-bold mb-2">{category.name}</h3>
+                  {category.description && (
+                    <p className="text-sm text-white/80 line-clamp-2">{category.description}</p>
+                  )}
+                  <div className="mt-4 flex items-center justify-between">
+                    <span className="text-xs text-white/60">
+                      {category.isLeaf ? 'Leaf Category' : 'Container Category'}
+                    </span>
+                    <svg className="w-5 h-5 transform group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </div>
+                </div>
+                <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity" />
+              </Link>
+            ))}
+          </div>
+        )}
       </section>
     </div>
   )
