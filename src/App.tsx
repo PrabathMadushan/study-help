@@ -10,9 +10,12 @@ import { NotePage } from './pages/NotePage'
 import { LoginPage } from './pages/LoginPage'
 import { SignUpPage } from './pages/SignUpPage'
 import { ReviewPage } from './pages/ReviewPage'
+import { ExamPage } from './pages/ExamPage'
 import { DashboardPage } from './pages/DashboardPage'
 import { CategoriesTreeManage } from './pages/admin/CategoriesTreeManage'
 import { NotesManage } from './pages/admin/NotesManage'
+import { FlashcardsManage } from './pages/admin/FlashcardsManage'
+import { ExamQuestionsManage } from './pages/admin/ExamQuestionsManage'
 import { ValidationTools } from './pages/admin/ValidationTools'
 
 const router = createBrowserRouter([
@@ -36,6 +39,7 @@ const router = createBrowserRouter([
       { path: 'graph', element: <GraphPage /> },
       { path: 'graph/:categoryId', element: <GraphPage /> },
       { path: 'review', element: <ReviewPage /> },
+      { path: 'exam', element: <ExamPage /> },
       { path: 'dashboard', element: <DashboardPage /> },
       { path: 'note/:id', element: <NotePage /> },
     ],
@@ -50,6 +54,8 @@ const router = createBrowserRouter([
     children: [
       { path: 'categories', element: <CategoriesTreeManage /> },
       { path: 'notes', element: <NotesManage /> },
+      { path: 'flashcards', element: <FlashcardsManage /> },
+      { path: 'exam-questions', element: <ExamQuestionsManage /> },
       { path: 'validation', element: <ValidationTools /> },
     ],
   },

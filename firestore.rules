@@ -91,6 +91,26 @@ service cloud.firestore {
     }
     
     // ============================================
+    // FLASHCARDS (per leaf category)
+    // Path: /flashcards/{flashcardId}
+    // ============================================
+    match /flashcards/{flashcardId} {
+      allow read: if request.auth != null;
+      allow create, update: if isAdmin() && isValidFlashcard();
+      allow delete: if isAdmin();
+    }
+    
+    // ============================================
+    // EXAM QUESTIONS (per leaf category)
+    // Path: /exam_questions/{questionId}
+    // ============================================
+    match /exam_questions/{questionId} {
+      allow read: if request.auth != null;
+      allow create, update: if isAdmin() && isValidExamQuestion();
+      allow delete: if isAdmin();
+    }
+    
+    // ============================================
     // HELPER FUNCTIONS
     // ============================================
     
@@ -171,6 +191,32 @@ service cloud.firestore {
         && data.order is number
         && (!('interviewAnswer' in data) || (data.interviewAnswer is string && data.interviewAnswer.size() <= 5000))
         && data.path[data.path.size() - 1] == data.categoryId;
+    }
+    
+    // Validate flashcard document
+    function isValidFlashcard() {
+      let data = request.resource.data;
+      return data.keys().hasOnly(['categoryId', 'question', 'answer', 'order', 'createdAt', 'updatedAt'])
+        && data.categoryId is string && data.categoryId.size() > 0 && data.categoryId.size() <= 100
+        && data.question is string && data.question.size() > 0 && data.question.size() <= 2000
+        && data.answer is string && data.answer.size() > 0 && data.answer.size() <= 10000
+        && data.order is number
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+    
+    // Validate exam question document
+    function isValidExamQuestion() {
+      let data = request.resource.data;
+      return data.keys().hasOnly(['categoryId', 'question', 'type', 'options', 'correctAnswer', 'order', 'createdAt', 'updatedAt'])
+        && data.categoryId is string && data.categoryId.size() > 0 && data.categoryId.size() <= 100
+        && data.question is string && data.question.size() > 0 && data.question.size() <= 2000
+        && data.type is string && (data.type == 'mcq' || data.type == 'short')
+        && data.correctAnswer is string && data.correctAnswer.size() <= 2000
+        && data.order is number
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp
+        && (!('options' in data) || (data.options is list && data.options.size() <= 20));
     }
   }
 }

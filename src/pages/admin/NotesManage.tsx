@@ -88,27 +88,27 @@ export function NotesManage() {
     <div className="max-w-6xl mx-auto">
       <div className="mb-6">
         <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">
-          Manage Notes
+          Manage Learning Articles
         </h1>
         <p className="text-gray-600 dark:text-gray-400">
-          Create and edit notes within leaf categories.
+          One learning article (note) per leaf category is recommended. Add content for learners and optional interview answer for legacy practice.
         </p>
       </div>
 
       {/* Category Selector */}
       <div className="mb-6 bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-          Select Category (Leaf categories only)
+          Select Leaf Category
         </label>
         <CategorySelector
           value={selectedCategoryId}
           onChange={setSelectedCategoryId}
           filterLeafOnly={true}
-          placeholder="Choose a leaf category to manage notes"
+          placeholder="Choose a leaf category for the learning article"
         />
         {selectedCategoryId && (
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-            Only leaf categories can contain notes.
+            Use one note per leaf as the learning article. Add flashcards and exam questions in their admin sections.
           </p>
         )}
       </div>
@@ -119,7 +119,7 @@ export function NotesManage() {
           <div className="mb-6 bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
-                Notes in Category
+                Learning Article (Notes in this category)
               </h2>
               {!isCreating && (
                 <button
@@ -137,7 +137,7 @@ export function NotesManage() {
               </div>
             ) : notes.length === 0 ? (
               <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                No notes in this category yet.
+                No learning article yet. Add one note for this leaf.
               </div>
             ) : (
               <div className="space-y-4">
@@ -260,7 +260,7 @@ export function NotesManage() {
       {!selectedCategoryId && (
         <div className="text-center py-12 bg-white dark:bg-gray-800 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-700">
           <p className="text-gray-600 dark:text-gray-400">
-            Select a leaf category above to manage notes.
+            Select a leaf category to manage its learning article (one note per leaf recommended).
           </p>
         </div>
       )}

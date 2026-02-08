@@ -95,6 +95,18 @@ export function Layout() {
                 >
                   Practice
                 </NavLink>
+                <NavLink
+                  to="/exam"
+                  className={({ isActive }) =>
+                    `inline-flex items-center justify-center px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm font-medium rounded-lg transition-colors whitespace-nowrap ${
+                      isActive
+                        ? 'text-violet-700 dark:text-violet-300 bg-violet-100/80 dark:bg-violet-900/30'
+                        : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100/80 dark:hover:bg-gray-800/80'
+                    }`
+                  }
+                >
+                  Exam
+                </NavLink>
               </div>
             </nav>
 

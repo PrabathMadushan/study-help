@@ -30,3 +30,33 @@ export interface Note {
   createdAt?: Date
   updatedAt?: Date
 }
+
+/**
+ * Flashcard for practice mode – one of many per leaf category
+ */
+export interface Flashcard {
+  id: string
+  categoryId: string  // leaf category id
+  question: string
+  answer: string
+  order: number
+  createdAt?: Date
+  updatedAt?: Date
+}
+
+/**
+ * Exam question – one of many per leaf category
+ */
+export type ExamQuestionType = 'mcq' | 'short'
+
+export interface ExamQuestion {
+  id: string
+  categoryId: string  // leaf category id
+  question: string
+  type: ExamQuestionType
+  options?: string[]  // required for mcq
+  correctAnswer: string
+  order: number
+  createdAt?: Date
+  updatedAt?: Date
+}

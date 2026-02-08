@@ -13,7 +13,7 @@ import {
   serverTimestamp
 } from 'firebase/firestore'
 import { getFirestoreDb } from './firebase'
-import type { Category, Note } from '../types/firestore'
+import type { Category, Note, Flashcard, ExamQuestion } from '../types/firestore'
 
 /**
  * Create a new category with automatic depth and path computation
@@ -384,4 +384,109 @@ export async function updateNote(id: string, data: Partial<Omit<Note, 'id' | 'cr
 export async function deleteNote(id: string): Promise<void> {
   const db = getFirestoreDb()
   await deleteDoc(doc(db, 'notes', id))
+}
+
+// ============== Flashcards (per leaf category) ==============
+
+export async function createFlashcard(data: Omit<Flashcard, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> {
+  const db = getFirestoreDb()
+  const docRef = doc(collection(db, 'flashcards'))
+  const cleanData = {
+    categoryId: data.categoryId,
+    question: data.question.trim(),
+    answer: data.answer.trim(),
+    order: data.order,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  }
+  await setDoc(docRef, cleanData)
+  return docRef.id
+}
+
+export async function updateFlashcard(id: string, data: Partial<Omit<Flashcard, 'id' | 'categoryId' | 'createdAt' | 'updatedAt'>>): Promise<void> {
+  const db = getFirestoreDb()
+  const docRef = doc(db, 'flashcards', id)
+  const cleanData: Record<string, unknown> = { updatedAt: serverTimestamp() }
+  if (data.question !== undefined) cleanData.question = data.question.trim()
+  if (data.answer !== undefined) cleanData.answer = data.answer.trim()
+  if (data.order !== undefined) cleanData.order = data.order
+  await updateDoc(docRef, cleanData)
+}
+
+export async function deleteFlashcard(id: string): Promise<void> {
+  const db = getFirestoreDb()
+  await deleteDoc(doc(db, 'flashcards', id))
+}
+
+export async function getFlashcardsByCategoryId(categoryId: string): Promise<Flashcard[]> {
+  const db = getFirestoreDb()
+  const q = query(
+    collection(db, 'flashcards'),
+    where('categoryId', '==', categoryId),
+    orderBy('order', 'asc')
+  )
+  const snapshot = await getDocs(q)
+  return snapshot.docs.map((d) => ({
+    id: d.id,
+    ...d.data(),
+    createdAt: d.data().createdAt?.toDate?.(),
+    updatedAt: d.data().updatedAt?.toDate?.(),
+  })) as Flashcard[]
+}
+
+// ============== Exam questions (per leaf category) ==============
+
+export async function createExamQuestion(data: Omit<ExamQuestion, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> {
+  const db = getFirestoreDb()
+  const docRef = doc(collection(db, 'exam_questions'))
+  const options = data.type === 'mcq' ? (data.options ?? []) : []
+  const cleanData = {
+    categoryId: data.categoryId,
+    question: data.question.trim(),
+    type: data.type,
+    options,
+    correctAnswer: data.correctAnswer.trim(),
+    order: data.order,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  }
+  await setDoc(docRef, cleanData)
+  return docRef.id
+}
+
+export async function updateExamQuestion(id: string, data: Partial<Omit<ExamQuestion, 'id' | 'categoryId' | 'createdAt' | 'updatedAt'>>): Promise<void> {
+  const db = getFirestoreDb()
+  const docRef = doc(db, 'exam_questions', id)
+  const cleanData: Record<string, unknown> = { updatedAt: serverTimestamp() }
+  if (data.question !== undefined) cleanData.question = data.question.trim()
+  if (data.type !== undefined) cleanData.type = data.type
+  if (data.options !== undefined) cleanData.options = Array.isArray(data.options) ? data.options : []
+  if (data.correctAnswer !== undefined) cleanData.correctAnswer = data.correctAnswer.trim()
+  if (data.order !== undefined) cleanData.order = data.order
+  await updateDoc(docRef, cleanData)
+}
+
+export async function deleteExamQuestion(id: string): Promise<void> {
+  const db = getFirestoreDb()
+  await deleteDoc(doc(db, 'exam_questions', id))
+}
+
+export async function getExamQuestionsByCategoryId(categoryId: string): Promise<ExamQuestion[]> {
+  const db = getFirestoreDb()
+  const q = query(
+    collection(db, 'exam_questions'),
+    where('categoryId', '==', categoryId),
+    orderBy('order', 'asc')
+  )
+  const snapshot = await getDocs(q)
+  return snapshot.docs.map((d) => {
+    const raw = d.data()
+    return {
+      id: d.id,
+      ...raw,
+      options: raw.options ?? [],
+      createdAt: raw.createdAt?.toDate?.(),
+      updatedAt: raw.updatedAt?.toDate?.(),
+    }
+  }) as ExamQuestion[]
 }

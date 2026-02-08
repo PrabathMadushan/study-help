@@ -90,6 +90,30 @@ export function AdminLayout() {
             Notes
           </NavLink>
           <NavLink
+            to="/admin/flashcards"
+            className={({ isActive }) =>
+              `px-4 py-2 rounded-lg transition-colors ${
+                isActive
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+              }`
+            }
+          >
+            Flashcards
+          </NavLink>
+          <NavLink
+            to="/admin/exam-questions"
+            className={({ isActive }) =>
+              `px-4 py-2 rounded-lg transition-colors ${
+                isActive
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+              }`
+            }
+          >
+            Exam Questions
+          </NavLink>
+          <NavLink
             to="/admin/validation"
             className={({ isActive }) =>
               `px-4 py-2 rounded-lg transition-colors ${

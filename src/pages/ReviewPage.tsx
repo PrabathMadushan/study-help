@@ -1,17 +1,21 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import {
-  getNoteIdsWithFlashcards,
-  filterNoteIdsWithFlashcards,
-  shuffleNoteIds,
-} from '../data/flashcards'
-import { getNoteById } from '../data/notes'
-import { flashcardData } from '../data/flashcards'
+import { useAllFlashcards, useFlashcards } from '../hooks/useFlashcards'
 import { useProgress } from '../hooks/useProgress'
 import { validateFlashcardAnswer } from '../lib/validateAnswer'
 import { useGeminiSpeechRecognition } from '../hooks/useGeminiSpeechRecognition'
+import type { Flashcard } from '../types/firestore'
 
-type ReviewLocationState = { noteIds?: string[]; startDeck?: 'all' } | null
+type ReviewLocationState = { categoryId?: string; categoryIds?: string[]; startDeck?: 'all' } | null
+
+function shuffle<T>(arr: T[]): T[] {
+  const a = [...arr]
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[a[i], a[j]] = [a[j], a[i]]
+  }
+  return a
+}
 
 function useSpeechSynthesis() {
   const speak = useCallback((text: string) => {
@@ -61,7 +65,13 @@ function ScoreDisplay({ score, feedback }: { score: number; feedback?: string })
 export function ReviewPage() {
   const location = useLocation()
   const navigate = useNavigate()
-  const [sessionNoteIds, setSessionNoteIds] = useState<string[] | null>(null)
+  const state = location.state as ReviewLocationState
+  const categoryIdFromState = state?.categoryId ?? null
+
+  const { flashcards: allFlashcards } = useAllFlashcards()
+  const { flashcards: categoryFlashcards } = useFlashcards(categoryIdFromState)
+
+  const [sessionCards, setSessionCards] = useState<Flashcard[] | null>(null)
   const [currentIndex, setCurrentIndex] = useState(0)
   const [userAnswer, setUserAnswer] = useState('')
   const [submitted, setSubmitted] = useState(false)
@@ -71,25 +81,25 @@ export function ReviewPage() {
   const { startListening, stopListening, listening, supported: speechRecognitionSupported, permissionState: micPermission, usingGemini } = useGeminiSpeechRecognition()
   const { speak, supported: ttsSupported } = useSpeechSynthesis()
 
-  const allNoteIds = getNoteIdsWithFlashcards()
-
   useEffect(() => {
-    const state = location.state as ReviewLocationState
-    if (!state) return
-    const ids =
-      state.noteIds ?? (state.startDeck === 'all' ? getNoteIdsWithFlashcards() : [])
-    const withFlashcards = filterNoteIdsWithFlashcards(ids)
-    if (withFlashcards.length === 0) return
-    setSessionNoteIds(shuffleNoteIds(withFlashcards))
+    if (!state || (!state.startDeck && !state.categoryId)) return
+    const deck = state.startDeck === 'all'
+      ? allFlashcards
+      : state.categoryId
+        ? categoryFlashcards
+        : []
+    if (deck.length === 0) return
+    setSessionCards(shuffle(deck))
     setCurrentIndex(0)
     setUserAnswer('')
     setSubmitted(false)
     setScoreResult(null)
     navigate(location.pathname, { replace: true, state: {} })
-  }, [location.state, location.pathname, navigate])
+  }, [state, allFlashcards, categoryFlashcards, navigate, location.pathname])
 
   function startPracticeAll() {
-    setSessionNoteIds(shuffleNoteIds([...allNoteIds]))
+    if (allFlashcards.length === 0) return
+    setSessionCards(shuffle([...allFlashcards]))
     setCurrentIndex(0)
     setUserAnswer('')
     setSubmitted(false)
@@ -97,24 +107,23 @@ export function ReviewPage() {
   }
 
   async function handleSubmit() {
-    if (!sessionNoteIds || submitted) return
-    const noteId = sessionNoteIds[currentIndex]
-    const modelAnswer = flashcardData[noteId]?.interviewAnswer ?? ''
+    if (!sessionCards || submitted) return
+    const card = sessionCards[currentIndex]
     setValidating(true)
     try {
-      const result = await validateFlashcardAnswer(userAnswer, modelAnswer)
+      const result = await validateFlashcardAnswer(userAnswer, card.answer)
       setScoreResult(result)
       setSubmitted(true)
-      setNoteScore(noteId, result.score)
+      setNoteScore(card.id, result.score)
     } finally {
       setValidating(false)
     }
   }
 
   function handleNext() {
-    if (!sessionNoteIds) return
-    if (currentIndex + 1 >= sessionNoteIds.length) {
-      setSessionNoteIds(null)
+    if (!sessionCards) return
+    if (currentIndex + 1 >= sessionCards.length) {
+      setSessionCards(null)
       setCurrentIndex(0)
       setUserAnswer('')
       setSubmitted(false)
@@ -132,7 +141,7 @@ export function ReviewPage() {
     setUserAnswer(transcript)
   }, [])
 
-  if (sessionNoteIds == null || sessionNoteIds.length === 0) {
+  if (sessionCards == null || sessionCards.length === 0) {
     return (
       <div className="max-w-2xl mx-auto">
         {/* Hero */}
@@ -148,7 +157,7 @@ export function ReviewPage() {
           </p>
         </div>
 
-        {allNoteIds.length === 0 ? (
+        {allFlashcards.length === 0 ? (
           <div className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900/50 p-8 text-center">
             <div className="w-12 h-12 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center mx-auto mb-4">
               <svg className="w-6 h-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -171,7 +180,7 @@ export function ReviewPage() {
               <div>
                 <p className="font-semibold text-gray-900 dark:text-white">Ready to practice?</p>
                 <p className="text-sm text-gray-500 dark:text-gray-400">
-                  {allNoteIds.length} question{allNoteIds.length !== 1 ? 's' : ''} available
+                  {allFlashcards.length} question{allFlashcards.length !== 1 ? 's' : ''} available
                 </p>
               </div>
             </div>
@@ -193,12 +202,10 @@ export function ReviewPage() {
     )
   }
 
-  const noteId = sessionNoteIds[currentIndex]
-  const note = getNoteById(noteId)
-  const data = flashcardData[noteId]
-  const modelAnswer = data?.interviewAnswer ?? ''
-  const isLast = currentIndex + 1 >= sessionNoteIds.length
-  const progress = ((currentIndex + 1) / sessionNoteIds.length) * 100
+  const card = sessionCards[currentIndex]
+  const modelAnswer = card.answer
+  const isLast = currentIndex + 1 >= sessionCards.length
+  const progress = ((currentIndex + 1) / sessionCards.length) * 100
 
   return (
     <div className="max-w-2xl mx-auto">
@@ -206,12 +213,12 @@ export function ReviewPage() {
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
           <span className="text-sm font-medium text-gray-900 dark:text-white">
-            Question {currentIndex + 1} of {sessionNoteIds.length}
+            Question {currentIndex + 1} of {sessionCards.length}
           </span>
         </div>
         <button
           type="button"
-          onClick={() => setSessionNoteIds(null)}
+          onClick={() => setSessionCards(null)}
           className="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
         >
           Exit
@@ -237,14 +244,14 @@ export function ReviewPage() {
           <div className="flex-1">
             <p className="text-sm font-medium text-violet-600 dark:text-violet-400 mb-1">Question</p>
             <p className="text-xl font-semibold text-gray-900 dark:text-white">
-              {note?.title ?? noteId}
+              {card.question}
             </p>
           </div>
         </div>
         {ttsSupported && (
           <button
             type="button"
-            onClick={() => speak(note?.title ?? noteId)}
+            onClick={() => speak(card.question)}
             className="mt-4 inline-flex items-center gap-2 text-sm text-violet-600 dark:text-violet-400 hover:text-violet-700 dark:hover:text-violet-300 transition-colors"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

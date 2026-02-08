@@ -1,18 +1,9 @@
 import { useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useNote } from '../hooks/useNotes'
+import { useCategoryPath } from '../hooks/useCategoryPath'
 import { useProgress } from '../hooks/useProgress'
 import { LoadingScreen } from '../components/LoadingScreen'
-import { doc, getDoc } from 'firebase/firestore'
-import { getFirestoreDb } from '../lib/firebase'
-import { useState } from 'react'
-
-// Temporary fallback to static data
-import { getNoteById } from '../data/notes'
-import { getCategoryById } from '../data/categories'
-import { getSubcategoryById } from '../data/subcategories'
-import { getSubSubcategoryById } from '../data/subSubcategories'
-import { noteContents } from '../notes'
 
 function ScoreBadge({ score }: { score: number }) {
   const variant =
@@ -34,65 +25,14 @@ function ScoreBadge({ score }: { score: number }) {
 
 export function NotePage() {
   const { id } = useParams<{ id: string }>()
-  const { note: dynamicNote, loading: noteLoading } = useNote(id)
-  const [category, setCategory] = useState<any>(null)
-  const [subcategory, setSubcategory] = useState<any>(null)
-  const [subSubcategory, setSubSubcategory] = useState<any>(null)
+  const { note, loading: noteLoading } = useNote(id ?? null)
+  const categoryIdForPath: string | null = note?.categoryId ?? null
+  const { path: categoryPath } = useCategoryPath(categoryIdForPath)
   const { getNoteProgress, setNoteViewed } = useProgress()
-  
-  // Fallback to static data if dynamic note not found
-  const staticNote = id ? getNoteById(id) : undefined
-  const note = dynamicNote || staticNote
-  const isUsingDynamicData = !!dynamicNote
-  
+
   const progress = note ? getNoteProgress(note.id) : undefined
-  const getContent = note && !isUsingDynamicData ? noteContents[note.id] : null
-
-  // Fetch related entities (category, subcategory, subSubcategory)
-  useEffect(() => {
-    if (!note) return
-
-    const fetchRelatedData = async () => {
-      try {
-        if (note.categoryId) {
-          const catDoc = await getDoc(doc(getFirestoreDb(), 'categories', note.categoryId))
-          if (catDoc.exists()) {
-            setCategory({ id: catDoc.id, ...catDoc.data() })
-          } else {
-            setCategory(getCategoryById(note.categoryId))
-          }
-        }
-
-        if (note.subcategoryId) {
-          const subDoc = await getDoc(doc(getFirestoreDb(), 'subcategories', note.subcategoryId))
-          if (subDoc.exists()) {
-            setSubcategory({ id: subDoc.id, ...subDoc.data() })
-          } else if (note.categoryId) {
-            setSubcategory(getSubcategoryById(note.categoryId, note.subcategoryId))
-          }
-        }
-
-        if (note.subSubcategoryId) {
-          const subSubDoc = await getDoc(doc(getFirestoreDb(), 'subSubcategories', note.subSubcategoryId))
-          if (subSubDoc.exists()) {
-            setSubSubcategory({ id: subSubDoc.id, ...subSubDoc.data() })
-          } else if (note.categoryId && note.subcategoryId) {
-            setSubSubcategory(getSubSubcategoryById(note.categoryId, note.subcategoryId, note.subSubcategoryId))
-          }
-        }
-      } catch (error) {
-        console.error('Error fetching related data:', error)
-        // Fallback to static data
-        if (note.categoryId) setCategory(getCategoryById(note.categoryId))
-        if (note.subcategoryId && note.categoryId) setSubcategory(getSubcategoryById(note.categoryId, note.subcategoryId))
-        if (note.subSubcategoryId && note.subcategoryId && note.categoryId) {
-          setSubSubcategory(getSubSubcategoryById(note.categoryId, note.subcategoryId, note.subSubcategoryId))
-        }
-      }
-    }
-
-    fetchRelatedData()
-  }, [note?.id, note?.categoryId, note?.subcategoryId, note?.subSubcategoryId])
+  const backTo = note?.categoryId ? `/graph/${note.categoryId}` : '/graph'
+  const backLabel = categoryPath.length > 0 ? categoryPath[categoryPath.length - 1]?.name ?? 'Category' : 'Graph'
 
   useEffect(() => {
     if (note) {
@@ -123,21 +63,14 @@ export function NotePage() {
     )
   }
 
-  const backTo =
-    note.subSubcategoryId && note.subcategoryId
-      ? `/category/${note.categoryId}/${note.subcategoryId}/${note.subSubcategoryId}`
-      : note.subcategoryId
-        ? `/category/${note.categoryId}/${note.subcategoryId}`
-        : `/category/${note.categoryId}`
-  const backLabel = subSubcategory?.name ?? subcategory?.name ?? category?.name ?? note.categoryId
-
-  // Breadcrumb items
-  const breadcrumbs = [
+  // Breadcrumb: Home > ...category path
+  const breadcrumbs: { label: string; to: string }[] = [
     { label: 'Home', to: '/' },
-    category && { label: category.name, to: `/category/${category.id}` },
-    subcategory && { label: subcategory.name, to: `/category/${category?.id}/${subcategory.id}` },
-    subSubcategory && { label: subSubcategory.name, to: `/category/${category?.id}/${subcategory?.id}/${subSubcategory.id}` },
-  ].filter(Boolean) as { label: string; to: string }[]
+    ...categoryPath.map((cat) => ({
+      label: [cat.icon, cat.name].filter(Boolean).join(' ') || cat.name,
+      to: `/graph/${cat.id}`,
+    })),
+  ]
 
   return (
     <article className="max-w-6xl mx-auto">
@@ -182,29 +115,35 @@ export function NotePage() {
 
           <Link
             to="/review"
-            state={{ noteIds: [note.id] }}
+            state={{ categoryId: note.categoryId }}
             className="inline-flex items-center gap-2 text-sm font-medium text-violet-600 dark:text-violet-400 hover:text-violet-700 dark:hover:text-violet-300 transition-colors"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
               <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            Practice this note
+            Practice
+          </Link>
+          <Link
+            to="/exam"
+            state={{ categoryId: note.categoryId }}
+            className="inline-flex items-center gap-2 text-sm font-medium text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+            </svg>
+            Take exam
           </Link>
         </div>
       </header>
 
       {/* Content */}
       <div className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900/50 p-6 sm:p-8 shadow-sm">
-        {isUsingDynamicData && dynamicNote ? (
-          <div 
+        {note.content ? (
+          <div
             className="note-body prose dark:prose-invert max-w-none"
-            dangerouslySetInnerHTML={{ __html: dynamicNote.content }}
+            dangerouslySetInnerHTML={{ __html: note.content }}
           />
-        ) : getContent ? (
-          <div className="note-body">
-            {getContent()}
-          </div>
         ) : (
           <div className="text-center py-12">
             <div className="w-12 h-12 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center mx-auto mb-4">
@@ -229,7 +168,7 @@ export function NotePage() {
             </div>
             <Link
               to="/review"
-              state={{ noteIds: [note.id] }}
+              state={{ categoryId: note.categoryId }}
               className="btn-primary shrink-0 inline-flex items-center gap-2"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -264,7 +203,7 @@ export function NotePage() {
             </div>
             <Link
               to="/review"
-              state={{ noteIds: [note.id] }}
+              state={{ categoryId: note.categoryId }}
               className="btn-secondary inline-flex items-center gap-2"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
